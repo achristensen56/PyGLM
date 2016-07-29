@@ -12,10 +12,10 @@ def sigmoid(x):
 
 
 def sig_gam_model(weights, stim, scale, c): 
-'''
-full prediction (including draws) for weights, stimulus (design matrix), scale, 
-and c (offset) provided. 
-'''   
+	'''
+	full prediction (including draws) for weights, stimulus (design matrix), scale, 
+	and c (offset) provided. 
+	'''   
 	h = stim.dot(weights)
 	f = scale*sigmoid(h - c) 
 	y = np.random.gamma(1, f)
@@ -25,11 +25,24 @@ def exp_gam_model(weights, stim, scale, c):
 	h = stim.dot(weights)
 	f = scale*np.exp(h-c)
 	y = np.random.gamma(1, f)
+	return y
 
 def sig_cond_int(weights, stim, scale, c):
 	h = stim.dot(weights)
 	f = scale*sigmoid(h-c)
 	return f
+
+def poisson_model(weights, stim, scale, c):
+	h = stim.dot(weights)
+	f = scale*sigmoid(h - c) 
+	y = np.random.poisson(f)
+	return y
+
+def gaussian_model(weights, stim, scale, c):
+	h = stim.dot(weights)
+	f = scale*sigmoid(h - c) 
+	y = np.random.normal(f)
+	return y
 
 def exp_cond_int(weights, stim, scale, c):
 	h = stim.dot(weights)
@@ -49,6 +62,18 @@ def generate_exp_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp =
 	stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
 	y = exp_gam_model(weights, stim, scale, c)
+	return stim, weights, y
+
+def generate_poisson_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+	stim = np.random.normal(0, scale = 2, size = [T, n])
+	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
+	y = poisson_model(weights, stim, scale, c)
+	return stim, weights, y
+
+def generate_gaussian_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+	stim = np.random.normal(0, scale = 2, size = [T, n])
+	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
+	y = gaussian_model(weights, stim, scale, c)
 	return stim, weights, y
 
 def gridplot(num_rows, num_cols):
@@ -77,7 +102,7 @@ def exp_likelihood(X, y, scale, offset, weights):
 	non-linearity, at scale, offset, and weights provided. 
 	'''
 
-	fx = X.dot(weights) = offset
+	fx = X.dot(weights) - offset
 	lam = np.exp(fx)
 	lam_ = scale*lam + 1e-3
 	coef = np.log(lam_)
@@ -89,10 +114,10 @@ def simpleaxis(ax):
 	'''
 	remove the top and right spines and ticks from the axis. 
 	'''
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
+	ax.spines['top'].set_visible(False)
+	ax.spines['right'].set_visible(False)
+	ax.get_xaxis().tick_bottom()
+	ax.get_yaxis().tick_left()
 
 
 

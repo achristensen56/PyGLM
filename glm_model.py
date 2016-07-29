@@ -1,9 +1,11 @@
 	    
 #Need to make big GLM class, and make exp, poisson, and gaussian all inherit from it. 
 #get data from allen institute (need also script for easy downloading of data)
-
+import tensorflow as tf
 
 from glm_utils import *
+
+import pyprind
 
 class exponential_GLM():
 	'''
@@ -138,10 +140,9 @@ class exponential_GLM():
 		MSE between conditional intensity predicted given current params and design matrix X, 
 		and observations y. 
 		'''
-
 		_, cond = self.predict(X)
 
-		return np.mean((cond - y)**2))
+		return np.mean((cond - y)**2)
 
 
 
@@ -253,10 +254,10 @@ class poisson_GLM():
 		'''
 		return None
 
-class poisson_GLM():
+class gaussian_GLM():
 	def __init__(self, N, weight_init, max_iters = 100,
 		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
-		reg = 'l1', alpha = .1, non_lin = tf.exp, scale_init = 1, verbose = True):
+		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
 		initializes the computational graph for a poisson GLM with either exponential
 		or sigmoidal non-linearity. 
@@ -277,7 +278,7 @@ class poisson_GLM():
 		self.train_step =  tf.train.AdamOptimizer(self.lr).minimize(self.log_loss)
 		self.sess.run(tf.initialize_all_variables())
 
-	def _logloss():
+	def _logloss(self):
 		'''
 		Gaussian Log loss
 		'''
@@ -313,10 +314,10 @@ class poisson_GLM():
 			bar = pyprind.ProgBar(self.max_iters, bar_char='*')
 
 		for i in range(self.max_iters):
-		    idx = np.random.randint(0, T, size = batch_size)
+		    #idx = np.random.randint(0, T, size = batch_size)
 		    
-		    train_feat = X[idx] 
-		    train_obs = y[idx]
+		    train_feat = X 
+		    train_obs = y
 
 		    if self.verbose:
 		    	bar.update()
