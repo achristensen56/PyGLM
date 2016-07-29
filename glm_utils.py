@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 
 #make data generation code for poisson and gaussian GLM's
 #add deconvolution code (fancy deconvolution)
-#add train test split code s
+#add train test split code 
+#make the non-linearities generic for the data generation code. 
 
 def sigmoid(x):
 	return 1.0/(1.0 + np.exp(-x)) + 1e-4
@@ -65,12 +66,18 @@ def generate_exp_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp =
 	return stim, weights, y
 
 def generate_poisson_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+	'''
+	sigmoidal non-linearity
+	'''
 	stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
 	y = poisson_model(weights, stim, scale, c)
 	return stim, weights, y
 
 def generate_gaussian_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+	'''
+	sigmoidal non-linearity
+	'''
 	stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
 	y = gaussian_model(weights, stim, scale, c)
