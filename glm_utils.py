@@ -8,79 +8,86 @@ import matplotlib.pyplot as plt
 #add train test split code 
 #make the non-linearities generic for the data generation code. 
 
+
+def generate_data(T = 1000, n = 30, eps = 1e-4, 
+				noise_model = 'exponential', non_lin = np.exp, 
+				c = 3, scale = 5, filt_amp = 10):
+	'''
+	currently supports noise_model = {'exponential', 'gaussian', 'poisson'}
+	non_lin should be any function that applies elementwise to it's single 
+	argument. 
+	'''
+
+	if noise_model == 'exponential':
+		stim, weights, y = generate_gamma_data(non_lin, T = 1000, n = 30, eps = 1e-1,
+											c = 3, scale = 5, filt_amp = 10)
+
+	elif noise_model == 'gaussian':
+		stim, weights, y = generate_gaussian_data(non_lin, T = 1000, n = 30, eps = 1e-1,
+		 									c = 3, scale = 5, filt_amp = 10)
+
+	elif noise_model == 'poisson':
+		stim, weights, y = generate_poisson_data(non_lin, T = 1000, n = 30, eps = 1e-1,
+		 									c = 3, scale = 5, filt_amp = 10)
+	else:
+		print "Noise model not recognized. Aborting..." 
+		return None
+
+	return stim, weights, y
+
+
+
 def sigmoid(x):
 	return 1.0/(1.0 + np.exp(-x)) + 1e-4
 
 
-def sig_gam_model(weights, stim, scale, c): 
+def cond_int(non_lin, weights, stim, scale, c):
 	'''
-	full prediction (including draws) for weights, stimulus (design matrix), scale, 
-	and c (offset) provided. 
-	'''   
+	returns the conditional intensity \lambda = f(w^TX)
+	'''
 	h = stim.dot(weights)
-	f = scale*sigmoid(h - c) 
-	y = np.random.gamma(1, f)
-	return y
-
-def exp_gam_model(weights, stim, scale, c):
-	h = stim.dot(weights)
-	f = scale*np.exp(h-c)
-	y = np.random.gamma(1, f)
-	return y
-
-def sig_cond_int(weights, stim, scale, c):
-	h = stim.dot(weights)
-	f = scale*sigmoid(h-c)
+	f = scale*non_lin(h-c)
 	return f
 
-def poisson_model(weights, stim, scale, c):
-	h = stim.dot(weights)
-	f = scale*sigmoid(h - c) 
-	y = np.random.poisson(f)
+def gamma_model(cond_int, p = 1):
+	'''
+	draws from a gamma distribution with shape parameter p. 
+	and mean 'cond_int'
+	'''
+	y = np.random.gamma(p, cond_int)
 	return y
 
-def gaussian_model(weights, stim, scale, c):
-	h = stim.dot(weights)
-	f = scale*sigmoid(h - c) 
-	y = np.random.normal(f)
+
+def poisson_model(cond_int):
+	y = np.random.poisson(cond_int)
 	return y
 
-def exp_cond_int(weights, stim, scale, c):
-	h = stim.dot(weights)
-	f = scale*np.exp(h -c)
-	return f
+def gaussian_model(cond_int):
+	y = np.random.normal(cond_int)
+	return y
 
-def generate_sig_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
-	'''simulate data, with normally distributed stimulus, and a gaussian filter. 
-	Generates data from a exponential GLM, with sigmoid non-linearity
+def generate_gamma_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+	stim = np.random.normal(0, scale = 2, size = [T, n])
+	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
+	y = gamma_model(cond_int(non_lin, weights, stim, scale, c))
+	return stim, weights, y
+
+def generate_poisson_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+	'''
+	poisson data with any non-linearity
 	'''
 	stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
-	y = sig_gam_model(weights, stim, scale, c)
+	y = poisson_model(cond_int(non_lin, weights, stim, scale, c))
 	return stim, weights, y
 
-def generate_exp_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
-	stim = np.random.normal(0, scale = 2, size = [T, n])
-	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
-	y = exp_gam_model(weights, stim, scale, c)
-	return stim, weights, y
-
-def generate_poisson_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+def generate_gaussian_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
 	'''
 	sigmoidal non-linearity
 	'''
 	stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
-	y = poisson_model(weights, stim, scale, c)
-	return stim, weights, y
-
-def generate_gaussian_data(T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
-	'''
-	sigmoidal non-linearity
-	'''
-	stim = np.random.normal(0, scale = 2, size = [T, n])
-	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
-	y = gaussian_model(weights, stim, scale, c)
+	y = gaussian_model(cond_int(non_lin, weights, stim, scale, c))
 	return stim, weights, y
 
 def gridplot(num_rows, num_cols):
@@ -91,31 +98,6 @@ def gridplot(num_rows, num_cols):
 	ax = [plt.subplot(gs[i]) for i in range(num_rows*num_cols)]
 
 	return gs, ax
-
-def sig_likelihood(X, y, scale, offset, weights):
-	'''Evaluate the likelihood for an exponential noise model, and sigmoidal
-	non-linearity, at scale, offset, and weights provided. 
-	'''
-	fx = X.dot(weights) - offset
-	lam = sigmoid(fx)
-	lam_ = scale*lam + 1e-3
-	coef = np.log(lam_)
-	distrib = y / lam_
-
-	return np.sum(coef + distrib)
-
-def exp_likelihood(X, y, scale, offset, weights): 
-	'''Evaluate the likelihood for an exponential noise model, and exponential 
-	non-linearity, at scale, offset, and weights provided. 
-	'''
-
-	fx = X.dot(weights) - offset
-	lam = np.exp(fx)
-	lam_ = scale*lam + 1e-3
-	coef = np.log(lam_)
-	distrib = y/lam_
-
-	return np.sum(coef + distrib)
 
 def simpleaxis(ax):
 	'''
