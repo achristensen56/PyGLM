@@ -1,4 +1,6 @@
 *.pyc
 MNIST_data
-Deprecated Notebooks
+deprecated notebooks
 .*
+boc/*.json
+boc/*/*.nwb

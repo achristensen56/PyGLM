@@ -25,7 +25,7 @@ class GLM():
 
 	'''
 
-	def __init__(self, N, weight_init, max_iters = 100,
+	def __init__(self, N, weight_init,
 		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
@@ -34,8 +34,8 @@ class GLM():
 		'''	
 
 		self.non_lin, self.alpha, self.reg, self.verbose = non_lin, alpha, reg, verbose
-		self.max_iters, self.lr, self.eps = max_iters, lr, eps
-
+		self.lr, self.eps = lr, eps
+		self.max_iters = 1000;
 		self.sess = tf.Session()
 		
 		self.design_ = tf.placeholder('float32', [None, N])
@@ -52,10 +52,11 @@ class GLM():
 		pass
 
 
-	def fit(self, X, y, X_val, y_val, batch_size = 1000, non_lin = tf.exp):
+	def fit(self, X, y, X_val, y_val, batch_size = 1000, non_lin = tf.exp, max_iters = 500):
 
 		loss_arr = []
 		cross_val = []
+		self.max_iters = max_iters
 
 		T = X.shape[0]
 
@@ -71,11 +72,11 @@ class GLM():
 		    if self.verbose:
 		    	bar.update()
 		    
-		    l, _ = self.sess.run([self.log_loss, self.train_step], feed_dict = {self.design_:train_feat, self.obs_: train_obs[:, np.newaxis]})
+		    l, _ = self.sess.run([self.log_loss, self.train_step], feed_dict = {self.design_:train_feat, self.obs_: train_obs})
 		    
 		    if i % 10 == 0:
 
-		    	l1 = self.sess.run([self.log_loss], feed_dict = {self.design_:X_val, self.obs_:y_val[:, np.newaxis]})
+		    	l1 = self.sess.run([self.log_loss], feed_dict = {self.design_:X_val, self.obs_:y_val})
 		    	cross_val.append(l1)
 		    	    
 		    loss_arr.append(l)	    
@@ -91,9 +92,8 @@ class GLM():
 		lam = self.non_lin(fx) 
 		return lam
 
-	def predict(self, X):
+	def predict_trace(self, X):
 		return self.sess.run(self.predict, feed_dict = {self.design_:X})
-
 
 	def get_params(self):
 		'''
@@ -114,7 +114,6 @@ class GLM():
 class exponential_GLM(GLM):
 	'''
 	Parameters:
-		max_iters = 100
 		eps = 1e-4
 		init = {'ols', 'random'}
 		lr = 1e-2
@@ -126,7 +125,7 @@ class exponential_GLM(GLM):
 		v_loss_arr
 	'''
 
-	def __init__(self, N, weight_init, max_iters = 100,
+	def __init__(self, N, weight_init,
 		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
@@ -135,7 +134,7 @@ class exponential_GLM(GLM):
 		
 		'''	
 		
-		GLM.__init__(self, N, weight_init, max_iters, lr, eps, bias_init, train_params,
+		GLM.__init__(self, N, weight_init, lr, eps, bias_init, train_params,
 			reg, alpha, non_lin, scale_init, verbose)
 
 	def _logloss(self):
