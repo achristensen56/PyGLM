@@ -108,5 +108,7 @@ def simpleaxis(ax):
 	ax.get_xaxis().tick_bottom()
 	ax.get_yaxis().tick_left()
 
+def relu(X):
+	return X*(X > 0)
 
 

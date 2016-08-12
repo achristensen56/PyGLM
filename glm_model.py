@@ -26,8 +26,8 @@ class GLM():
 	'''
 
 	def __init__(self, N, weight_init,
-		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
-		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
+		lr = 1e-2, eps = 1e-4, bias_init = 0, train_params = True,
+		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 3, verbose = True):
 		'''
 		Initialize the computational graph for the exponential GLM. 
 		
@@ -64,7 +64,7 @@ class GLM():
 			bar = pyprind.ProgBar(self.max_iters, bar_char='*')
 
 		for i in range(self.max_iters):
-		    #idx = np.random.randint(0, T, size = batch_size)
+		    idx = np.random.randint(0, T, size = batch_size)
 		    
 		    train_feat = X#[idx] 
 		    train_obs = y#[idx]
@@ -126,7 +126,7 @@ class exponential_GLM(GLM):
 	'''
 
 	def __init__(self, N, weight_init,
-		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
+		lr = 1e-2, eps = 1e-4, bias_init = 0, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
 		Initialize the computational graph for the exponential GLM. Inherits from 
@@ -166,7 +166,7 @@ class exponential_GLM(GLM):
 
 
 class poisson_GLM(GLM):
-	def __init__(self, N, weight_init, max_iters = 100,
+	def __init__(self, N, weight_init, 
 		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
@@ -174,7 +174,7 @@ class poisson_GLM(GLM):
 		or sigmoidal non-linearity. 
 		'''			
 
-		GLM.__init__(self, N, weight_init, max_iters, lr, eps, bias_init, train_params,
+		GLM.__init__(self, N, weight_init, lr, eps, bias_init, train_params,
 			reg, alpha, non_lin, scale_init, verbose)
 
 	def _logloss(self):
@@ -209,7 +209,7 @@ class poisson_GLM(GLM):
 
 
 class gaussian_GLM(GLM):
-	def __init__(self, N, weight_init, max_iters = 100,
+	def __init__(self, N, weight_init,
 		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
@@ -217,7 +217,7 @@ class gaussian_GLM(GLM):
 		or sigmoidal non-linearity. 
 		'''	
 
-		GLM.__init__(self, N, weight_init, max_iters, lr, eps, bias_init, train_params,
+		GLM.__init__(self, N, weight_init, lr, eps, bias_init, train_params,
 			reg, alpha, non_lin, scale_init, verbose)
 
 	def _logloss(self):
