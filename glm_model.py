@@ -66,8 +66,8 @@ class GLM():
 		for i in range(self.max_iters):
 		    idx = np.random.randint(0, T, size = batch_size)
 		    
-		    train_feat = X#[idx] 
-		    train_obs = y#[idx]
+		    train_feat = X[idx] 
+		    train_obs = y[idx]
 
 		    if self.verbose:
 		    	bar.update()
