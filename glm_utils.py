@@ -2,36 +2,49 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import numpy as np
+import tensorflow as tf
+
+
+
+
+
 
 #make data generation code for poisson and gaussian GLM's
 #add deconvolution code (fancy deconvolution)
 #add train test split code 
-#make the non-linearities generic for the data generation code. 
+#make the non-linearities generic for the data generation code.
 
 
-def generate_data(T = 1000, n = 30, eps = 1e-4, 
+def generate_data(T = 10000, n = 30, eps = 1e-4, 
 				noise_model = 'exponential', non_lin = np.exp, 
 				c = 3, scale = 5, filt_amp = 10):
 	'''
 	currently supports noise_model = {'exponential', 'gaussian', 'poisson'}
 	non_lin should be any function that applies elementwise to it's single 
 	argument. 
+
+	returns design, weights, observations
 	'''
 
 	if noise_model == 'exponential':
-		stim, weights, y = generate_gamma_data(non_lin, T = 1000, n = 30, eps = 1e-1,
-											c = 3, scale = 5, filt_amp = 10)
+		stim, weights, y = generate_gamma_data(non_lin, T = T, n = n, eps = eps,
+											c = c, scale = scale, filt_amp = filt_amp)
 
 	elif noise_model == 'gaussian':
-		stim, weights, y = generate_gaussian_data(non_lin, T = 1000, n = 30, eps = 1e-1,
-		 									c = 3, scale = 5, filt_amp = 10)
+		stim, weights, y = generate_gaussian_data(non_lin, T = T, n = n, eps = eps,
+		 									c = c, scale = scale, filt_amp = filt_amp)
 
 	elif noise_model == 'poisson':
-		stim, weights, y = generate_poisson_data(non_lin, T = 1000, n = 30, eps = 1e-1,
-		 									c = 3, scale = 5, filt_amp = 10)
-	else:
-		print "Noise model not recognized. Aborting..." 
-		return None
+		stim, weights, y = generate_poisson_data(non_lin, T = T, n = n, eps = eps,
+		 									c = c, scale = scale, filt_amp = filt_amp)
+	elif noise_model == None:
+		stim, weights, y = generate_gamma_data(non_lin, T = T, n = n, eps = eps,
+									c = c, scale = scale, filt_amp = filt_amp)
+		
+		y = non_lin(stim.dot(weights))
 
 	return stim, weights, y
 
@@ -69,7 +82,7 @@ def gaussian_model(cond_int):
 def generate_gamma_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
 	stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
-	y = gamma_model(cond_int(non_lin, weights, stim, scale, c))
+	y = gamma_model(cond_int(non_lin, weights, stim, scale, c) + eps)
 	return stim, weights, y
 
 def generate_poisson_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
@@ -94,7 +107,7 @@ def gridplot(num_rows, num_cols):
 	'''get axis and gridspec objects for grid plotting 
 	returns gs, ax
 	'''
-	gs = gridspec.GridSpec(num_rows, num_cols, wspace=0.0)
+	gs = gridspec.GridSpec(num_rows, num_cols, wspace=5.0)
 	ax = [plt.subplot(gs[i]) for i in range(num_rows*num_cols)]
 
 	return gs, ax

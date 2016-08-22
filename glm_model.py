@@ -25,13 +25,15 @@ class GLM():
 
 	'''
 
-	def __init__(self, N, weight_init,
+	def __init__(self, weight_init,
 		lr = 1e-2, eps = 1e-4, bias_init = 0, train_params = True,
-		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 3, verbose = True):
+		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
 		Initialize the computational graph for the exponential GLM. 
 		
 		'''	
+
+		N, _ = weight_init.shape
 
 		self.non_lin, self.alpha, self.reg, self.verbose = non_lin, alpha, reg, verbose
 		self.lr, self.eps = lr, eps
@@ -40,11 +42,21 @@ class GLM():
 		
 		self.design_ = tf.placeholder('float32', [None, N])
 		self.obs_ = tf.placeholder('float32', [None, 1])
+		
 		self.weights = tf.Variable(weight_init, dtype = 'float32')
+
 		self.offset = tf.Variable(bias_init, dtype = 'float32', trainable = train_params)
 		self.scale = tf.Variable(scale_init, dtype = 'float32', trainable = train_params)
 		self.log_loss = self._logloss()
 		self.predict = self._predict()
+
+		#optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
+		#gvs = optimizer.compute_gradients(self.log_loss)
+		#capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+		#self.train_step = optimizer.apply_gradients(capped_gvs)
+
+
+
 		self.train_step =  tf.train.AdamOptimizer(self.lr).minimize(self.log_loss)
 		self.sess.run(tf.initialize_all_variables())
 
@@ -52,22 +64,21 @@ class GLM():
 		pass
 
 
-	def fit(self, X, y, X_val, y_val, batch_size = 1000, non_lin = tf.exp, max_iters = 500):
+	def fit(self, X, y, X_val, y_val, batch_size = 1000, max_iters = 500):
 
 		loss_arr = []
 		cross_val = []
-		self.max_iters = max_iters
 
 		T = X.shape[0]
 
 		if self.verbose:
-			bar = pyprind.ProgBar(self.max_iters, bar_char='*')
+			bar = pyprind.ProgBar(max_iters, bar_char='*')
 
-		for i in range(self.max_iters):
+		for i in range(max_iters):
 		    idx = np.random.randint(0, T, size = batch_size)
 		    
-		    train_feat = X[idx] 
-		    train_obs = y[idx]
+		    train_feat = X#[idx] 
+		    train_obs = y#[idx]
 
 		    if self.verbose:
 		    	bar.update()
@@ -89,7 +100,8 @@ class GLM():
 		and new design matrix provided by the user.  
 		'''
 		fx = tf.matmul(self.design_, self.weights) - self.offset
-		lam = self.non_lin(fx) 
+		lam = self.non_lin(fx)
+
 		return lam
 
 	def predict_trace(self, X):
@@ -125,7 +137,7 @@ class exponential_GLM(GLM):
 		v_loss_arr
 	'''
 
-	def __init__(self, N, weight_init,
+	def __init__(self, weight_init,
 		lr = 1e-2, eps = 1e-4, bias_init = 0, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
@@ -134,7 +146,7 @@ class exponential_GLM(GLM):
 		
 		'''	
 		
-		GLM.__init__(self, N, weight_init, lr, eps, bias_init, train_params,
+		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params,
 			reg, alpha, non_lin, scale_init, verbose)
 
 	def _logloss(self):
@@ -166,7 +178,7 @@ class exponential_GLM(GLM):
 
 
 class poisson_GLM(GLM):
-	def __init__(self, N, weight_init, 
+	def __init__(self, weight_init, 
 		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
@@ -174,7 +186,7 @@ class poisson_GLM(GLM):
 		or sigmoidal non-linearity. 
 		'''			
 
-		GLM.__init__(self, N, weight_init, lr, eps, bias_init, train_params,
+		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params,
 			reg, alpha, non_lin, scale_init, verbose)
 
 	def _logloss(self):
@@ -209,7 +221,7 @@ class poisson_GLM(GLM):
 
 
 class gaussian_GLM(GLM):
-	def __init__(self, N, weight_init,
+	def __init__(self, weight_init,
 		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
@@ -217,7 +229,7 @@ class gaussian_GLM(GLM):
 		or sigmoidal non-linearity. 
 		'''	
 
-		GLM.__init__(self, N, weight_init, lr, eps, bias_init, train_params,
+		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params,
 			reg, alpha, non_lin, scale_init, verbose)
 
 	def _logloss(self):
