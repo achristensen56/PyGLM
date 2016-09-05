@@ -138,7 +138,7 @@ class exponential_GLM(GLM):
 	'''
 
 	def __init__(self, weight_init,
-		lr = 1e-2, eps = 1e-4, bias_init = 0, train_params = True,
+		lr = 1e-2, eps = 1e-4, bias_init = 0, train_params = False,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
 		Initialize the computational graph for the exponential GLM. Inherits from 
