@@ -6,17 +6,16 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import tensorflow as tf
-
-
-
-
-
-
-#make data generation code for poisson and gaussian GLM's
-#add deconvolution code (fancy deconvolution)
-#add train test split code 
-#make the non-linearities generic for the data generation code.
-
+import allensdk.brain_observatory.stimulus_info as stim_info
+from allensdk.core.brain_observatory_cache import BrainObservatoryCache
+from scipy import asarray as ar,exp
+from scipy import stats
+from scipy.stats import spearmanr
+from scipy.stats import levene
+import pandas as pd
+import sys
+import logging
+logging.basicConfig()
 
 def generate_data(T = 10000, n = 30, eps = 1e-4, 
 				noise_model = 'exponential', non_lin = np.exp, 
@@ -107,7 +106,7 @@ def gridplot(num_rows, num_cols):
 	'''get axis and gridspec objects for grid plotting 
 	returns gs, ax
 	'''
-	gs = gridspec.GridSpec(num_rows, num_cols, wspace=5.0)
+	gs = gridspec.GridSpec(num_rows, num_cols, wspace=0.0)
 	ax = [plt.subplot(gs[i]) for i in range(num_rows*num_cols)]
 
 	return gs, ax
@@ -125,3 +124,193 @@ def relu(X):
 	return X*(X > 0)
 
 
+def download_data(region, cre_line):
+	'''
+	region = [reg1, reg2, ...]
+	cre_line = [line1, line2, ...]
+	'''
+
+	boc = BrainObservatoryCache(manifest_file='boc/manifest.json')
+	ecs = boc.get_experiment_containers(targeted_structures=region, cre_lines=cre_line)
+
+	ec_ids = [ ec['id'] for ec in ecs ]
+
+	exp = boc.get_ophys_experiments(experiment_container_ids=ec_ids)
+	
+
+	exp_id_list = [ec['id'] for ec in exp]
+	data_set = {exp_id:boc.get_ophys_experiment_data(exp_id) for exp_id in exp_id_list}
+
+	return data_set 
+
+
+def arrange_data_rs(data_set, bin = True):
+	'''
+	arranges the data for running speed tuning curve purposes
+	dataset = {experiment_id: boc dataset}
+	'''
+	ds_data = {}
+
+	#collect the stimulus tables, and running speed for each dataset
+	for ds in data_set.keys():
+	    _, dff = data_set[ds].get_dff_traces()
+	    cells = data_set[ds].get_cell_specimen_ids()
+	    
+	    data = {'cell_ids':cells, 'raw_dff':dff }
+	    for stimulus in data_set[ds].list_stimuli():
+	        
+	        if stimulus == 'spontaneous':      
+	            table = data_set[ds].get_spontaneous_activity_stimulus_table()
+	        else:
+	            table = data_set[ds].get_stimulus_table(stimulus)
+	            
+	        data[stimulus] = table
+
+	    dxcm, dxtime = data_set[ds].get_running_speed()
+	    data['running_speed'] = dxcm
+	    
+	    ds_data[ds] = data
+
+	#arrange the data for each separate stimuli in a dictionary. Not averaging over
+	#presentation of a given image, just concatenating all cell traces, and corresponing
+	#running speed. 
+	arranged_data = {}
+	for ds in data_set.keys():
+	    dff_data = ds_data[ds]
+	    
+	    data = {}
+	    for stimulus in data_set[ds].list_stimuli():
+	        rs = np.zeros([1])
+	        dfof = np.zeros([len(dff_data['cell_ids']), 1])
+	        for index, row in dff_data[stimulus].iterrows():
+	            dfof = np.concatenate((dfof, dff_data['raw_dff'][:, row['start']: row['end']]), axis = 1)
+	            rs = np.concatenate((rs, dff_data['running_speed'][row['start']: row['end']]), axis = 0)     
+
+	        data[stimulus + '_rs'] = np.array(np.squeeze(rs))
+	        data[stimulus + '_dff'] = np.array(np.squeeze(dfof))
+	        
+	    arranged_data[ds] = data  
+
+	#groups the data into 'natural', 'spontaneous', or 'artificial'
+	#TODO: subsample
+
+	tb_data = {}
+	for ds_id in arranged_data.keys():
+	    
+	    data  = arranged_data[ds_id]
+	    
+	    _data = {'synthetic_rs': None, 'natural_rs': None, 'spontaneous_rs': None,'synthetic_dff': None, 'natural_dff': None, 'spontaneous_dff':None}
+	    for stimulus in data_set[ds_id].list_stimuli():
+	        
+	        if (stimulus == 'locally_sparse_noise') or ('gratings' in stimulus):
+	            stim_key = 'synthetic'
+	        elif ('natural' in stimulus):
+	            stim_key = 'natural'
+	        elif ('spontaneous' == stimulus):
+	            stim_key = 'spontaneous'
+	            
+	        run_speed =  np.array(data[stimulus + '_rs'])
+	        dff = np.array(data[stimulus + '_dff'])
+	        
+	        if _data[stim_key + '_rs'] == None:
+	            _data[stim_key+ '_rs'] = run_speed
+	        else:
+	            _data[stim_key + '_rs'] = np.concatenate((_data[stim_key + '_rs'], run_speed), axis = 0)
+
+	           
+	        if _data[stim_key + '_dff'] == None:
+	            _data[stim_key+ '_dff'] = dff
+	        else:
+	            _data[stim_key + '_dff'] = np.concatenate((_data[stim_key + '_dff'], dff), axis = 1)		    
+	    
+	    tb_data[ds_id] = _data  
+	
+	return tb_data
+
+def make_tuning_curves(tb_data):
+	'''
+	returns a nested dictionary with key experiment id, key stimulus name, with 
+	a (tuning curve, (rho, spearmansp, levensp)) tuple. Tuning curve is a dictionary with key 
+	cell specimen ids, which contains a (19, 4) numpy array. The 0th column is the average response, 
+	the 1st column is the standard error, the 2nd column is the average shuffled response, and the 
+	3rd column is the shuffled standard error. 
+	'''
+
+	rs_results = {}
+	bin_hist = np.zeros([19, 2])
+	shuf_hist = np.zeros([19, 2])
+
+	for ds in tb_data.keys():
+	    stim_results = {}
+	    for stimulus in data_set[ds].list_stimuli():
+	        
+	        if ('gratings' in stimulus) or (stimulus == 'locally_sparse_noise'):
+	            stim_key = 'synthetic'
+	        if ('natural' in stimulus):
+	            stim_key = 'natural'
+	        if ('spontaneous' == stimulus):
+	            stim_key = 'spontaneous'
+	        
+	        
+	        neural_responses = {k: np.ones([19,4]) for k in data_set[ds].get_cell_specimen_ids()}            
+	        results = {}
+	        run_speed = np.array(tb_data[ds][stim_key + '_rs']).flatten()
+	        
+	        
+	        if max(run_speed) < 20:
+	            pass
+	        else:
+	        
+	            run_speed_shuffled = np.random.permutation(run_speed)
+	        
+	            bins = stats.mstats.mquantiles(run_speed, np.linspace(0, 1, 20), limit = (0, 50))
+	            shuf_bins = stats.mstats.mquantiles(run_speed_shuffled, np.linspace(0, 1, 20), limit = (0, 50))
+	            
+	            for ind, k in enumerate(data_set[ds].get_cell_specimen_ids()):
+
+	                temp = np.array(tb_data[ds][stim_key + '_dff'][ind])  
+	                
+	                for i in range(1, len(bins)):
+	                    bin_hist[i- 1] = [bins[i -1], bins[i]]
+	                    shuf_hist[i-1] = [bins[i-1], bins[i]]
+	                    
+	                    idx = np.where((run_speed > bins[i-1]) & (run_speed < bins[i]))
+	                    shuf_idx = np.where((run_speed_shuffled > shuf_bins[i-1]) & (run_speed_shuffled < shuf_bins[i]))
+	                    
+	                    #this control shouldn't be necessary
+	                    if len(idx[0] != 0):
+	                        av = np.mean(temp[idx[0]])
+	                        std = np.std(temp[idx[0]])
+	                        std_shuf = np.std(temp[shuf_idx[0]])
+	                        av_shuf = np.mean(temp[shuf_idx[0]])
+	                    else:
+	                        av = 0
+	                        std = 0
+
+	                    neural_responses[k][i-1, 0] = av
+	                    neural_responses[k][i-1, 1] = std / np.sqrt(len(temp[idx[0]]))
+	                    neural_responses[k][i-1, 2] = av_shuf
+	                    neural_responses[k][i-1, 3] = std / np.sqrt(len(temp[shuf_idx[0]]))
+
+	                
+	                x = np.log(np.mean(bin_hist, axis = 1))
+	                y = np.array(neural_responses[k][:, 0])
+
+	                shuf_x = np.log(np.mean(bin_hist, axis = 1))
+	                shuf_y = np.array(neural_responses[k][:, 2])
+	                
+	                stat, pvalue = levene(y, shuf_y)
+	                
+	                n = len(x)
+	                
+	                ymax = max(y)
+	                xmax = x[np.where(y == ymax)[0]]
+	                
+	                rho, p = spearmanr(x, y)
+	                    
+	                results[k] = rho, p, pvalue
+
+	        stim_results[stim_key] = (neural_responses, results)    
+	    rs_results[ds] = stim_results	
+
+	return rs_results
