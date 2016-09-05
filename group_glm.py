@@ -115,12 +115,11 @@ class GLM():
 
 	def score(self, X, y):
 		'''
-		MSE between conditional intensity predicted given current params and design matrix X, 
-		and observations y. 
+		likelihood of data. 
 		'''
-		_, cond = self.predict(X)
+		likelihood = self.sess.run(self.log_loss, feed_dict = {self.design_:X, self.obs_: y_val})
 
-		return np.mean((cond - y)**2)
+		return likelihood
 
 
 class exponential_GLM(GLM):
@@ -156,8 +155,9 @@ class exponential_GLM(GLM):
 
 		alpha = self.alpha
 
-		fx = tf.mul(self.design_, self.weights) 
+		
 		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
+		fx = tf.mul(self.design_, self.weights) 
 		fx = tf.reduce_sum(fx, [-1, num_features, num_neurons])- self.offset
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps
@@ -174,6 +174,7 @@ class exponential_GLM(GLM):
 
 		if self.reg == 'l1': 
 			self.loss += alpha*tf.reduce_sum(self.weights + self.offset + self.scale )
+		
 		return self.loss
 
 
@@ -217,10 +218,9 @@ class poisson_GLM(GLM):
 
 		if self.reg == 'l1': 
 			self.loss += alpha*tf.reduce_sum(self.weights + self.offset + self.scale )
+		
 		return self.loss
 
-
-		return None
 
 
 class gaussian_GLM(GLM):
@@ -258,7 +258,6 @@ class gaussian_GLM(GLM):
 
 		if self.reg == 'l1': 
 			self.loss += alpha*tf.reduce_sum(self.weights + self.offset + self.scale )
+		
 		return self.loss
 
-
-		return None

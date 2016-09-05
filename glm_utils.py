@@ -227,7 +227,7 @@ def arrange_data_rs(data_set, bin = True):
 	
 	return tb_data
 
-def make_tuning_curves(tb_data):
+def make_tuning_curves(tb_data, data_set):
 	'''
 	returns a nested dictionary with key experiment id, key stimulus name, with 
 	a (tuning curve, (rho, spearmansp, levensp)) tuple. Tuning curve is a dictionary with key 

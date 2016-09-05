@@ -10,7 +10,7 @@ def save_results(args):
 	region, cre_line = args
 	data_set = download_data([region], [cre_line])
 	arranged_data = arrange_data_rs(data_set)
-	results = make_tuning_curves(arranged_data)
+	results = make_tuning_curves(arranged_data, data_set)
 	output = open('./boc/formatted/' + region + cre_line + 'rsresults' + '.pkl', 'wb')
 	pickle.dump(results, output)
 	output.close()
@@ -19,8 +19,10 @@ def save_results(args):
 
 if __name__ == '__main__':
 	boc = BrainObservatoryCache(manifest_file='boc/manifest.json')
-	regions = ['VISal']#, 'VISl', 'VISp', 'VISpm']
-	lines =  ['Cux2-CreERT2', 'Rbp4-Cre', 'Rorb-IRES2-Cre'] 
+	regions = ['VISpm']
+        #['VISl', 'VISp', 'VISpm', 'VISal']
+	lines = ['Rorb-IRES2-Cre']
+        #['Cux2-CreERT2', 'Rbp4-Cre', 'Rorb-IRES2-Cre'] 
     
 	jobs = []
 	for reg, cre in it.product(regions, lines):
