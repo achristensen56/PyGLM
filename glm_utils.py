@@ -201,13 +201,20 @@ def arrange_data_rs(data_set, bin = True):
 	    
 	    data  = arranged_data[ds_id]
 	    
-	    _data = {'synthetic_rs': None, 'natural_rs': None, 'spontaneous_rs': None,'synthetic_dff': None, 'natural_dff': None, 'spontaneous_dff':None}
+	    #binning into synthetic, natural, and stimulus
+	    #_data = {'synthetic_rs': None, 'natural_rs': None, 'spontaneous_rs': None,'synthetic_dff': None, 'natural_dff': None, 'spontaneous_dff':None}
+	    
+	    #just binning into stimulus and spontaneous
+	    _data = {'stimulus_rs': None, 'spontaneous_rs': None,'stimulus_dff': None, 'spontaneous_dff':None}
+	    
 	    for stimulus in data_set[ds_id].list_stimuli():
 	        
 	        if (stimulus == 'locally_sparse_noise') or ('gratings' in stimulus):
-	            stim_key = 'synthetic'
+	            stim_key = 'stimulus'
+	            #stim_key = 'synthetic'
 	        elif ('natural' in stimulus):
-	            stim_key = 'natural'
+	            stim_key = 'stimulus'
+	            #stim_key = 'natural'
 	        elif ('spontaneous' == stimulus):
 	            stim_key = 'spontaneous'
 	            
@@ -247,9 +254,11 @@ def make_tuning_curves(tb_data, data_set):
 	    for stimulus in data_set[ds].list_stimuli():
 	        
 	        if ('gratings' in stimulus) or (stimulus == 'locally_sparse_noise'):
-	            stim_key = 'synthetic'
+	            stim_key = 'stimulus'
+	            #stim_key = 'synthetic'
 	        if ('natural' in stimulus):
-	            stim_key = 'natural'
+	            stim_key = 'stimulus'
+	            #stim_key = 'natural'
 	        if ('spontaneous' == stimulus):
 	            stim_key = 'spontaneous'
 	        

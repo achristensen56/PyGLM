@@ -33,29 +33,26 @@ class GLM():
 		
 		'''	
 
-		num_neurons, num_features = weight_init.shape
+		self.num_neurons, self.num_features = weight_init.shape
 
 		self.non_lin, self.alpha, self.reg, self.verbose = non_lin, alpha, reg, verbose
 		self.lr, self.eps = lr, eps
 		self.max_iters = 1000;
 		self.sess = tf.Session()
 		
-		self.design_ = tf.placeholder('float32', [None, num_neurons, num_features])
-		self.obs_ = tf.placeholder('float32', [None, num_neurons])
+		self.design_ = tf.placeholder('float32', [None, self.num_neurons*self.num_features])
+		self.obs_ = tf.placeholder('float32', [None, self.num_neurons])
 		
-		self.weights = tf.Variable(weight_init.reshape([num_neurons*num_features]), dtype = 'float32')
+		self.weights = tf.Variable(weight_init.reshape([self.num_neurons*self.num_features]), dtype = 'float32')
 
 		self.offset = tf.Variable(bias_init, dtype = 'float32', trainable = train_params)
 		self.scale = tf.Variable(scale_init, dtype = 'float32', trainable = train_params)
 		self.log_loss = self._logloss()
-		self.predict = self._predict()
 
 		#optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
 		#gvs = optimizer.compute_gradients(self.log_loss)
 		#capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
 		#self.train_step = optimizer.apply_gradients(capped_gvs)
-
-
 
 		self.train_step =  tf.train.AdamOptimizer(self.lr).minimize(self.log_loss)
 		self.sess.run(tf.initialize_all_variables())
@@ -77,8 +74,8 @@ class GLM():
 		for i in range(max_iters):
 		    idx = np.random.randint(0, T, size = batch_size)
 		    
-		    train_feat = X#[idx] 
-		    train_obs = y#[idx]
+		    train_feat = X[idx] 
+		    train_obs = y[idx]
 
 		    if self.verbose:
 		    	bar.update()
@@ -94,15 +91,6 @@ class GLM():
 
 		return loss_arr, cross_val 
 
-	def _predict(self):
-		'''
-		returns the conditional intensity, given the non_lin provided by user
-		and new design matrix provided by the user.  
-		'''
-		fx = tf.matmul(self.design_, self.weights) - self.offset
-		lam = self.non_lin(fx)
-
-		return lam
 
 	def predict_trace(self, X):
 		return self.sess.run(self.predict, feed_dict = {self.design_:X})
@@ -156,9 +144,10 @@ class exponential_GLM(GLM):
 		alpha = self.alpha
 
 		
-		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
+		
 		fx = tf.mul(self.design_, self.weights) 
-		fx = tf.reduce_sum(fx, [-1, num_features, num_neurons])- self.offset
+		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
+		fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps
 		
@@ -200,7 +189,7 @@ class poisson_GLM(GLM):
 
 		fx = tf.mul(self.design_, self.weights) 
 		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
-		fx = tf.reduce_sum(fx, [-1, num_features, num_neurons])- self.offset
+		fx = tf.reduce_sum(fx, reduction_indices =[1])- self.offset
 
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps
@@ -244,7 +233,7 @@ class gaussian_GLM(GLM):
 
 		fx = tf.mul(self.design_, self.weights) 
 		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
-		fx = tf.reduce_sum(fx, [-1, num_features, num_neurons])- self.offset
+		fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
 		
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps
