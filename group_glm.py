@@ -61,7 +61,7 @@ class GLM():
 		pass
 
 
-	def fit(self, X, y, X_val, y_val, batch_size = 1000, max_iters = 500):
+	def fit(self, X, y, X_val = None, y_val = None, batch_size = 1000, max_iters = 500):
 
 		loss_arr = []
 		cross_val = []
@@ -82,7 +82,7 @@ class GLM():
 		    
 		    l, _ = self.sess.run([self.log_loss, self.train_step], feed_dict = {self.design_:train_feat, self.obs_: train_obs})
 		    
-		    if i % 10 == 0:
+		    if i % 10 == 0 and X_val != None:
 
 		    	l1 = self.sess.run([self.log_loss], feed_dict = {self.design_:X_val, self.obs_:y_val})
 		    	cross_val.append(l1)
@@ -154,7 +154,7 @@ class exponential_GLM(GLM):
 
 		coef = tf.log(lam_)
 		distrib = tf.div(self.obs_, lam_)
-		self.loss = tf.reduce_sum(coef + distrib)
+		self.loss = tf.reduce_sum(coef + distrib, reduction_indices = [0])
 
 		if self.reg == 'l2':	
 			self.loss += alpha*tf.reduce_sum(tf.matmul(self.weights, self.weights, transpose_a = True))
@@ -238,7 +238,8 @@ class gaussian_GLM(GLM):
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps
 		
-		self.loss = tf.reduce_sum(tf.pow(self.obs_ - lam_, 2))
+		#returns a separate loss for each neuron
+		self.loss = tf.reduce_sum(tf.pow(self.obs_ - lam_, 2), reduction_indices = [0])
 
 		if self.reg == 'l2':	
 			self.loss += alpha*tf.reduce_sum(tf.matmul(self.weights, self.weights, transpose_a = True))

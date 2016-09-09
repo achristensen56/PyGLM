@@ -15,6 +15,7 @@ from scipy.stats import levene
 import pandas as pd
 import sys
 import logging
+from sklearn.decomposition import PCA
 logging.basicConfig()
 
 def generate_data(T = 10000, n = 30, eps = 1e-4, 
@@ -126,24 +127,70 @@ def relu(X):
 	return X*(X > 0)
 
 
-def download_data(region, cre_line):
+def download_data(region, cre_line, stimulus = None):
 	'''
 	region = [reg1, reg2, ...]
 	cre_line = [line1, line2, ...]
 	'''
-
 	boc = BrainObservatoryCache(manifest_file='boc/manifest.json')
 	ecs = boc.get_experiment_containers(targeted_structures=region, cre_lines=cre_line)
 
 	ec_ids = [ ec['id'] for ec in ecs ]
 
 	exp = boc.get_ophys_experiments(experiment_container_ids=ec_ids)
-	
+
+	if stimulus == None:
+		exp = boc.get_ophys_experiments(experiment_container_ids=ec_ids)
+
+	else:
+		exp = boc.get_ophys_experiments(experiment_container_ids=ec_ids, stimuli = stimulus)
+
 
 	exp_id_list = [ec['id'] for ec in exp]
+
 	data_set = {exp_id:boc.get_ophys_experiment_data(exp_id) for exp_id in exp_id_list}
 
 	return data_set 
+
+def pca_features(images):
+	model = PCA()
+	scenes_r = model.fit_transform(images.reshape([len(images), -1])) 
+
+	return scenes_r
+
+def get_data(data_set, stimulus):
+	time, dff_traces = data_set.get_dff_traces()
+	images = data_set.get_stimulus_template(stimulus)
+	stim_table = data_set.get_stimulus_table(stimulus)
+
+	return dff_traces, images, stim_table
+
+def arrange_data_glm(dff_traces, images, stim_table):
+	#declare a dictionary of empty lists for each cell trace, 
+	#and a list for the stimulus
+	data = []
+	stim_array = []
+
+	#average each trace over the presentation of each stimulus
+	for index, row in stim_table.iterrows():
+	    stim_array.append(images[row.frame])
+	    data.append(np.mean(dff_traces[:, row['start']:row['end'] ], axis = 1) )
+	    
+	stim_array = np.array(stim_array)
+	stim_array = stim_array[:, 0:10]
+
+	data = np.array(data)
+
+	n_timepoints, n_features = stim_array.shape
+	n_timepoints, n_neurons = data.shape
+
+	design = np.zeros([n_timepoints, n_neurons, n_features])
+
+	for i in range(n_neurons):
+		design[:, i, :] = stim_array
+
+	return data, design
+
 
 
 def arrange_data_rs(data_set, bin = True):
