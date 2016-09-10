@@ -29,21 +29,21 @@ class GLM():
 		'''
 		Initialize the computational graph for the exponential GLM. 
 
-		weight_init: num_neurons x n_features initialization for weights
+		weight_init: self.num_features, self.num_neurons initialization for weights
 		
 		'''	
 
-		self.num_neurons, self.num_features = weight_init.shape
+		self.num_features, self.num_neurons = weight_init.shape
 
 		self.non_lin, self.alpha, self.reg, self.verbose = non_lin, alpha, reg, verbose
 		self.lr, self.eps = lr, eps
 		self.max_iters = 1000;
 		self.sess = tf.Session()
 		
-		self.design_ = tf.placeholder('float32', [None, self.num_neurons*self.num_features])
+		self.design_ = tf.placeholder('float32', [None, self.num_features])
 		self.obs_ = tf.placeholder('float32', [None, self.num_neurons])
 		
-		self.weights = tf.Variable(weight_init.reshape([self.num_neurons*self.num_features]), dtype = 'float32')
+		self.weights = tf.Variable(weight_init, dtype = 'float32')
 
 		self.offset = tf.Variable(bias_init, dtype = 'float32', trainable = train_params)
 		self.scale = tf.Variable(scale_init, dtype = 'float32', trainable = train_params)
@@ -145,9 +145,9 @@ class exponential_GLM(GLM):
 
 		
 		
-		fx = tf.mul(self.design_, self.weights) 
-		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
-		fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
+		fx = tf.matmul(self.design_, self.weights) 
+		#fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
+		#fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps
 		
@@ -187,9 +187,9 @@ class poisson_GLM(GLM):
 
 		alpha = self.alpha
 
-		fx = tf.mul(self.design_, self.weights) 
-		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
-		fx = tf.reduce_sum(fx, reduction_indices =[1])- self.offset
+		fx = tf.matmul(self.design_, self.weights) 
+		#fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
+		#fx = tf.reduce_sum(fx, reduction_indices =[1])- self.offset
 
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps
@@ -231,9 +231,9 @@ class gaussian_GLM(GLM):
 
 		alpha = self.alpha
 
-		fx = tf.mul(self.design_, self.weights) 
-		fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
-		fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
+		fx = tf.matmul(self.design_, self.weights) 
+		#fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
+		#fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
 		
 		lam = self.non_lin(fx) 
 		lam_ = tf.mul(self.scale,lam)+ self.eps

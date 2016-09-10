@@ -20,7 +20,7 @@ logging.basicConfig()
 
 def generate_data(T = 10000, n = 30, eps = 1e-4, 
 				noise_model = 'exponential', non_lin = np.exp, 
-				c = 3, scale = 5, filt_amp = 10):
+				c = 3, scale = 5, filt_amp = 10, stim = None):
 	'''
 	currently supports noise_model = {'exponential', 'gaussian', 'poisson'}
 	non_lin should be any function that applies elementwise to it's single 
@@ -31,18 +31,18 @@ def generate_data(T = 10000, n = 30, eps = 1e-4,
 
 	if noise_model == 'exponential':
 		stim, weights, y = generate_gamma_data(non_lin, T = T, n = n, eps = eps,
-											c = c, scale = scale, filt_amp = filt_amp)
+											c = c, scale = scale, filt_amp = filt_amp, stim = stim)
 
 	elif noise_model == 'gaussian':
 		stim, weights, y = generate_gaussian_data(non_lin, T = T, n = n, eps = eps,
-		 									c = c, scale = scale, filt_amp = filt_amp)
+		 									c = c, scale = scale, filt_amp = filt_amp, stim = stim)
 
 	elif noise_model == 'poisson':
 		stim, weights, y = generate_poisson_data(non_lin, T = T, n = n, eps = eps,
-		 									c = c, scale = scale, filt_amp = filt_amp)
+		 									c = c, scale = scale, filt_amp = filt_amp, stim = stim)
 	elif noise_model == None:
-		stim, weights, y = generate_gamma_data(non_lin, T = T, n = n, eps = eps,
-									c = c, scale = scale, filt_amp = filt_amp)
+		stim, weights, y = generate_gaussian_data(non_lin, T = T, n = n, eps = eps,
+									c = c, scale = scale, filt_amp = filt_amp, stim = stim)
 		
 		y = non_lin(stim.dot(weights))
 
@@ -79,26 +79,30 @@ def gaussian_model(cond_int):
 	y = np.random.normal(cond_int)
 	return y
 
-def generate_gamma_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
-	stim = np.random.normal(0, scale = 2, size = [T, n])
+def generate_gamma_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10, stim = None):
+	if stim == None:
+		stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
 	y = gamma_model(cond_int(non_lin, weights, stim, scale, c) + eps)
 	return stim, weights, y
 
-def generate_poisson_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+def generate_poisson_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10, stim = None):
 	'''
 	poisson data with any non-linearity
 	'''
-	stim = np.random.normal(0, scale = 2, size = [T, n])
+	if stim == None:
+		stim = np.random.normal(0, scale = 2, size = [T, n])
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
 	y = poisson_model(cond_int(non_lin, weights, stim, scale, c))
 	return stim, weights, y
 
-def generate_gaussian_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10):
+def generate_gaussian_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10, stim = None):
 	'''
 	sigmoidal non-linearity
 	'''
-	stim = np.random.normal(0, scale = 2, size = [T, n])
+	if stim == None:
+		stim = np.random.normal(0, scale = 2, size = [T, n])
+	
 	weights = filt_amp*norm.pdf(range(0, n), loc = n/2, scale = n/10)
 	y = gaussian_model(cond_int(non_lin, weights, stim, scale, c))
 	return stim, weights, y
@@ -177,19 +181,15 @@ def arrange_data_glm(dff_traces, images, stim_table):
 	    data.append(np.mean(dff_traces[:, row['start']:row['end'] ], axis = 1) )
 	    
 	stim_array = np.array(stim_array)
-	stim_array = stim_array[:, 0:10]
+	#stim_array = stim_array[:, 0:10]
 
 	data = np.array(data)
 
 	n_timepoints, n_features = stim_array.shape
 	n_timepoints, n_neurons = data.shape
 
-	design = np.zeros([n_timepoints, n_neurons, n_features])
 
-	for i in range(n_neurons):
-		design[:, i, :] = stim_array
-
-	return data, design
+	return data, stim_array
 
 
 

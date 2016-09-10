@@ -29,7 +29,9 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 
 
 	n_time_bins, n_cells = dff_array.shape
-	_, _, n_features = design_matrix.shape
+	_, n_features = design_matrix.shape
+
+	#print 'the shape of the dff array is: ', dff_array.shape, 'the shape of the design matrix is: ', design_matrix.shape
 
 	n_nl, n_nm = len(non_linearity), len(noise_model)
 
@@ -66,13 +68,12 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 
 				X_train, X_test, y_train, y_test = train_test_split(design_matrix, dff_array)
 
-				weight_init = np.array([np.linalg.pinv(X_train[:, i, :]).dot(y_train[:, i]) for i in range(n_cells)])
+				weight_init = np.linalg.pinv(X_train).dot(y_train) 
 
-				model = nm_dict[nm](weight_init.reshape([n_cells, n_features]), 
+				model = nm_dict[nm](weight_init,
 					lr = lr, train_params = tp, eps = 1e-4, bias_init = 0, alpha = 0, reg = '', non_lin = nl, verbose = False)
 
-				L, l = model.fit(X_train.reshape(-1, n_cells*n_features), y_train, X_test.reshape(-1, n_cells*n_features), 
-					y_test, max_iters = 200, batch_size = 10000)
+				L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = 200, batch_size = 5000)
 				
 
 				w, o, s = model.get_params()	
@@ -128,6 +129,8 @@ if __name__ == '__main__':
 		for reg, cre in it.product(regions, lines):
 			data_set = download_data([reg], [cre], [stim_info.NATURAL_SCENES])
 			for key in data_set.keys():
-				p = multiprocessing.Process(target=save_results_GLM, args=((key, data_set[key]),))
-				jobs.append(p)
-				p.start()
+				#p = multiprocessing.Process(target=save_results_GLM, args=((key, data_set[key]),))
+				#jobs.append(p)
+				#p.start()
+
+				save_results_GLM((key, data_set[key]))
