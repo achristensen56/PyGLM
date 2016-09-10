@@ -73,7 +73,7 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 				model = nm_dict[nm](weight_init,
 					lr = lr, train_params = tp, eps = 1e-4, bias_init = 0, alpha = 0, reg = '', non_lin = nl, verbose = False)
 
-				L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = 200, batch_size = 5000)
+				L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = 200, batch_size = 4000)
 				
 
 				w, o, s = model.get_params()	
