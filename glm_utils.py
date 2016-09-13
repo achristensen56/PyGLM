@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.stats import norm
+import matplotlib as mpl
+mpl.use('TkAgg')
+
 import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
