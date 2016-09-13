@@ -39,8 +39,6 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 	features = np.zeros([n_cells, n_nl, n_nm, n_features + 2]) 
 
 	nm_dict = {'exponential': gm.exponential_GLM, 'gaussian': gm.gaussian_GLM}
-
-
 	b = pyprind.ProgBar(len(noise_model)* len(non_linearity))
 
 	for j, nm in enumerate(noise_model):
@@ -73,7 +71,7 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 				model = nm_dict[nm](weight_init,
 					lr = lr, train_params = tp, eps = 1e-4, bias_init = 0, alpha = 0, reg = '', non_lin = nl, verbose = False)
 
-				L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = 200, batch_size = 4000)
+				L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = 200, batch_size = 6000)
 				
 
 				w, o, s = model.get_params()	
@@ -90,7 +88,7 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 			#the parameters
 			w = np.mean(np.array(weights).reshape(5, n_cells, n_features), axis = 0)
 			o = np.mean(offset)
-			s = np.mean(offset)
+			s = np.mean(scale)
 			l = np.mean(np.array(test_l), axis = 0)
 
 			#the average of the final test likelihood is what we actually use for model comparison
@@ -108,7 +106,7 @@ def save_results_GLM((key, data_set)):
 	dff, images, stim_table = get_data(data_set, stim_info.NATURAL_SCENES)
 	r_images = pca_features(images)
 	data, stim_array = arrange_data_glm(dff, r_images, stim_table)
-	scores, features = fit_glm_CV(data, stim_array)
+	scores, features = fit_glm_CV(data, stim_array[:, 0:10])
 	output = open('./boc/formatted/' + str(key) + '_CV_results.pkl', 'wb')
 	pickle.dump((scores, features), output)
 	output.close()
@@ -117,12 +115,8 @@ def save_results_GLM((key, data_set)):
 
 if __name__ == '__main__':
 		boc = BrainObservatoryCache(manifest_file='boc/manifest.json')
-		regions = ['VISpm']
-
-		#['VISl', 'VISp', 'VISpm', 'VISal']
-		lines = ['Cux2-CreERT2']
-
-		#['Cux2-CreERT2', 'Rbp4-Cre', 'Rorb-IRES2-Cre'] 
+		regions = ['VISl', 'VISp', 'VISpm', 'VISal']
+		lines = ['Cux2-CreERT2', 'Rbp4-Cre', 'Rorb-IRES2-Cre'] 
 
 		jobs = []
 
