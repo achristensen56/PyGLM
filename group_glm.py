@@ -37,7 +37,6 @@ class GLM():
 
 		self.non_lin, self.alpha, self.reg, self.verbose = non_lin, alpha, reg, verbose
 		self.lr, self.eps = lr, eps
-		self.max_iters = 1000;
 		self.sess = tf.Session()
 		
 		self.design_ = tf.placeholder('float32', [None, self.num_features])
@@ -45,16 +44,17 @@ class GLM():
 		
 		self.weights = tf.Variable(weight_init, dtype = 'float32')
 
-		self.offset = tf.Variable(bias_init, dtype = 'float32', trainable = train_params)
-		self.scale = tf.Variable(scale_init, dtype = 'float32', trainable = train_params)
+		self.offset = bias_init*tf.Variable(np.ones([self.num_neurons]), dtype = 'float32', trainable = train_params)
+		self.scale = scale_init*tf.Variable(np.ones([self.num_neurons]), dtype = 'float32', trainable = train_params)
 		self.log_loss = self._logloss()
 
-		#optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
-		#gvs = optimizer.compute_gradients(self.log_loss)
-		#capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
-		#self.train_step = optimizer.apply_gradients(capped_gvs)
+		#capped gradients. TODO: make this optional. 
+		optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
+		gvs = optimizer.compute_gradients(self.log_loss)
+		capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+		self.train_step = optimizer.apply_gradients(capped_gvs)
 
-		self.train_step =  tf.train.AdamOptimizer(self.lr).minimize(self.log_loss)
+		#self.train_step =  tf.train.AdamOptimizer(self.lr).minimize(self.log_loss)
 		self.sess.run(tf.initialize_all_variables())
 
 	def _logloss():
@@ -99,7 +99,7 @@ class GLM():
 		'''
 		returns weights, offset, scale
 		'''
-		return self.weights.eval(self.sess), self.offset.eval(self.sess), self.scale.eval(self.sess)
+		return self.sess.run(self.weights), self.sess.run(self.offset), self.sess.run(self.weights)
 
 	def score(self, X, y):
 		'''
@@ -214,7 +214,7 @@ class poisson_GLM(GLM):
 
 class gaussian_GLM(GLM):
 	def __init__(self, weight_init,
-		lr = 1e-2, eps = 1e-4, bias_init = 3, train_params = True,
+		lr = 1e-2, eps = 1e-4, bias_init = 0, train_params = True,
 		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
 		'''
 		initializes the computational graph for a poisson GLM with either exponential

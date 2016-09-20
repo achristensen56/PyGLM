@@ -1,5 +1,4 @@
 	    
-
 import tensorflow as tf
 from glm_utils import *
 import pyprind
@@ -64,7 +63,7 @@ class GLM():
 		pass
 
 
-	def fit(self, X, y, X_val, y_val, batch_size = 1000, max_iters = 500):
+	def fit(self, X, y, X_val = None, y_val = None, batch_size = 1000, max_iters = 500):
 
 		loss_arr = []
 		cross_val = []
@@ -85,7 +84,7 @@ class GLM():
 		    
 		    l, _ = self.sess.run([self.log_loss, self.train_step], feed_dict = {self.design_:train_feat, self.obs_: train_obs})
 		    
-		    if i % 10 == 0:
+		    if (i % 10 == 0) and (X_val != None):
 
 		    	l1 = self.sess.run([self.log_loss], feed_dict = {self.design_:X_val, self.obs_:y_val})
 		    	cross_val.append(l1)

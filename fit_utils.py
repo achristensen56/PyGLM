@@ -47,7 +47,7 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 			b.update()
 			
 			tp = True
-			lr = 1e-4
+			lr = 1e-5
 
 			if nl == tf.exp or nl == tf.nn.relu:
 				#the exponential non-linearity 
@@ -69,7 +69,7 @@ def fit_glm_CV(dff_array, design_matrix, non_linearity = [tf.exp, tf.nn.sigmoid,
 				weight_init = np.linalg.pinv(X_train).dot(y_train) 
 
 				model = nm_dict[nm](weight_init,
-					lr = lr, train_params = tp, eps = 1e-4, bias_init = 0, alpha = 0, reg = '', non_lin = nl, verbose = False)
+					lr = lr, train_params = tp, alpha = 0, reg = '', non_lin = nl, verbose = False)
 
 				L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = 200, batch_size = 6000)
 				
@@ -107,7 +107,7 @@ def save_results_GLM((key, data_set)):
 	r_images = pca_features(images)
 	data, stim_array = arrange_data_glm(dff, r_images, stim_table)
 	scores, features = fit_glm_CV(data, stim_array[:, 0:10])
-	output = open('./boc/formatted/' + str(key) + '_CV_results.pkl', 'wb')
+	output = open('./boc/formatted/' + str(key) + '10_CV_results.pkl', 'wb')
 	pickle.dump((scores, features), output)
 	output.close()
 

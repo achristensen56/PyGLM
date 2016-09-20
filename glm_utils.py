@@ -1,8 +1,5 @@
 import numpy as np
 from scipy.stats import norm
-import matplotlib as mpl
-mpl.use('TkAgg')
-
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -179,7 +176,7 @@ def arrange_data_glm(dff_traces, images, stim_table):
 
 	#average each trace over the presentation of each stimulus
 	for index, row in stim_table.iterrows():
-	    stim_array.append(images[row.frame])
+	    stim_array.append(images[row['frame']])
 	    data.append(np.mean(dff_traces[:, row['start']:row['end'] ], axis = 1) )
 	    
 	stim_array = np.array(stim_array)
@@ -187,11 +184,33 @@ def arrange_data_glm(dff_traces, images, stim_table):
 
 	data = np.array(data)
 
-	n_timepoints, n_features = stim_array.shape
-	n_timepoints, n_neurons = data.shape
-
-
 	return data, stim_array
+
+def arrange_data_trialTensor(dff_traces, stim_table):
+	'''
+	In this function we want to take dff traces (n_neurons x ntrials*ntimepointspertrial)
+	and return data_Tensor = n_neurons x n_conditions x n_trials x trialLength
+
+	This is helpful for computing statistics of the data, like mean vs. standard deviation, 
+	and could be a useful multipurpose pipelining tool in the future.   
+	
+	at this point this is untested with stim_table objects other than that from 'Natural Scenes'
+
+	'''
+
+	n_neurons, _ = dff_traces.shape
+	trialLength = np.min(stim_table['end'] - stim_table['start'])
+	n_conditions = len(stim_table['frame'].unique())
+	n_trials = np.floor(len(stim_table['frame']) / n_conditions)
+
+	data_Tensor = np.zeros([n_neurons, n_conditions, n_trials, trialLength]);
+
+	trialCount = np.zeros([n_conditions])
+	for index, row in stim_table.iterrows():
+		data_Tensor[:, row['frame'], trialCount[row['frame']], :] = dff_traces[:, row['start']: row['start'] + trialLength]
+		trialCount[row['frame']] +=1
+
+	return data_Tensor, trialCount
 
 
 
