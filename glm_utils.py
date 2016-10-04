@@ -48,10 +48,11 @@ def generate_data(T = 10000, n = 30, eps = 1e-4,
 	return stim, weights, y
 
 
-
 def sigmoid(x):
 	return 1.0/(1.0 + np.exp(-x)) + 1e-4
 
+def tf_soft_rec(x):
+	return tf.log(1 + tf.exp(x))
 
 def cond_int(non_lin, weights, stim, scale, c):
 	'''
@@ -115,20 +116,143 @@ def gridplot(num_rows, num_cols):
 
 	return gs, ax
 
-def simpleaxis(ax):
+def simpleaxis(ax, bottom = False):
 	'''
 	remove the top and right spines and ticks from the axis. 
 	'''
 	ax.spines['top'].set_visible(False)
 	ax.spines['right'].set_visible(False)
-	ax.spines['bottom'].set_visible(False)
-	ax.get_xaxis().tick_bottom()
-	ax.get_xaxis().set_ticks([])
+	if bottom:
+		ax.spines['bottom'].set_visible(False)
+		ax.get_xaxis().set_ticks([])
+	else:
+		ax.get_xaxis().tick_bottom()
+	
+
 	ax.get_yaxis().tick_left()
 
 def relu(X):
 	return X*(X > 0)
 
+def get_data_stats(all_tensors):
+	'''
+	returns mean, std 
+	'''
+	mean = [0]
+	std = [0]
+
+	for key in all_tensors.keys():
+	    
+	    #this computes the mean across the axis of numTrials.
+	    t_mean = np.mean(all_tensors[key], 2).flatten()
+	    t_std = np.std(all_tensors[key], 2).flatten()
+	    
+
+	    
+	    mean = np.concatenate((mean, t_mean))
+	    std = np.concatenate((std, t_std))
+	
+	return mean, std
+
+def sort_scores(scores_dict):
+
+	t_per_exp = []
+	t_per_gaus = []
+
+	t_per_l_exp = []
+	t_per_l_sig = []
+	t_per_l_sr = []
+
+	le_dict = {}
+	lg_dict = {}
+
+
+	for key in scores_dict.keys():
+	    
+	    scores, features = scores_dict[key]
+	    
+	    n_cells, n_nl, n_nm = scores.shape
+
+	    best_noise_model = []
+	    best_non_linearity = []
+
+	    likelihood_exponential = []
+	    likelihood_gaussian = [] 
+
+	    for i in range(n_cells):
+	        idx = np.argmin(scores[i])
+
+	        nl_ind, nm_ind = np.unravel_index(idx, (n_nl, n_nm))
+
+	        if scores[i, nl_ind, nm_ind] != np.nan:
+	            best_noise_model.append(nm_ind)
+	            best_non_linearity.append(nl_ind)
+
+
+	            if nm_ind == 0:
+	                likelihood_exponential.append(scores[i, nl_ind, nm_ind])
+
+	            if nm_ind == 1:
+	                likelihood_gaussian.append(scores[i, nl_ind, nm_ind])
+	                
+	    best_noise_model = np.array(best_noise_model)
+	    best_non_linearity = np.array(best_non_linearity)
+	    
+	    per_exp = sum(best_noise_model == 0) / float(len(best_noise_model))
+	    per_gaus = sum(best_noise_model == 1) / float(len(best_noise_model))
+	    
+	    per_l_exp = sum(best_non_linearity == 0) / float(len(best_non_linearity))
+	    per_l_sig = sum(best_non_linearity == 1) / float(len(best_non_linearity))
+	    per_l_sr = sum(best_non_linearity == 2) / float(len(best_non_linearity))
+	    
+	    t_per_exp.append(per_exp)
+	    t_per_gaus.append(per_gaus)
+	    
+	    t_per_l_exp.append(per_l_exp)
+	    t_per_l_sig.append(per_l_sig)
+	    t_per_l_sr.append(per_l_sr)
+
+	    
+	    le = -np.array(scores[:, :, 0].flatten())
+	    le = le[~np.isnan(le)] 
+	    lg = -np.array(scores[:, :, 1].flatten())
+	    lg = lg[~np.isnan(lg)]
+
+	    le_dict[key] = le
+	    lg_dict[key] = lg
+
+
+	return t_per_exp, t_per_gaus, t_per_l_exp, t_per_l_sig, t_per_l_sr, lg_dict, le_dict
+
+def get_explainable_variance(data_tensor):
+	'''
+	data_tensor should be the output of arrange_data_trialTensor
+	
+	computes explainable variance by randomly splitting the trials in half, and regressing 1/2 the trials against
+	the other half of the trials. 
+	'''
+	from scipy.stats import linregress
+
+	n_neurons, n_conditions, n_trials, trialLength = data_tensor.shape
+
+	data_tensor = np.mean(data_tensor, axis = 3)
+
+	trial_idx = np.arange(0, n_trials)
+	trial_idx = np.random.permutation(trial_idx)
+
+	tr_1 = trial_idx[0:n_trials/2]
+	tr_2 = trial_idx[n_trials/2:]
+
+	av_1 = np.mean(data_tensor[:, :, tr_1], axis = 2)
+	av_2 = np.mean(data_tensor[:, :, tr_2], axis = 2)
+
+	ra_variance = np.zeros([n_neurons])
+
+	for i in range(n_neurons):
+		slope, intercept, r_value, p_value, std_err = linregress(av_1[i], av_2[i])
+		ra_variance[i] = r_value**2
+
+	return ra_variance
 
 def download_data(region, cre_line, stimulus = None):
 	'''
@@ -155,18 +279,67 @@ def download_data(region, cre_line, stimulus = None):
 
 	return data_set 
 
-def pca_features(images):
+def pca_features(images, scale = True):
+
+	if scale == True:
+
+		av = np.mean(images, axis = 0)
+		std = np.std(images, axis = 0)
+
+		images -= av
+		images /= std
+
 	model = PCA()
 	scenes_r = model.fit_transform(images.reshape([len(images), -1])) 
 
 	return scenes_r
 
 def get_data(data_set, stimulus):
+	'''
+	returns dff, images, stim_table
+	'''
+
 	time, dff_traces = data_set.get_dff_traces()
-	images = data_set.get_stimulus_template(stimulus)
+
+	try:
+		images = data_set.get_stimulus_template(stimulus)
+	except:
+		print "No stimulus template..."
+		images = None
+
 	stim_table = data_set.get_stimulus_table(stimulus)
 
 	return dff_traces, images, stim_table
+
+
+def arrange_data_tuning(dff, dxcm, stim_table, ratio = True, fps = 30):
+	'''
+	Calculate average responses to different stimulus conditions, with the stim_table serving
+	as a lookup table. 
+
+	If ratio is True, response will be calculated in the AIBS way, average(stim_onset + .5 sec)
+	/average(stim_onset - .5 secs)
+
+	returns responses: n_conditions x n_neurons
+	'''
+
+	responses = []
+
+	for i, row in stim_table.iterrows():
+
+		if ratio:
+			baseline = np.average(dff[:, row['start'] - fps : row['start']], axis = 1)
+			response = np.average(dff[:, row['start'] : row['start'] + fps], axis = 1)
+
+			ev_resp = (response - baseline) / baseline
+		else:
+			ev_resp = np.average(dff[:, row['start'] + fps/10: row['start'] + fps], axis = 1)
+
+		responses.append(ev_resp)
+
+	return np.array(responses)
+
+
 
 def arrange_data_glm(dff_traces, images, stim_table):
 	#declare a dictionary of empty lists for each cell trace, 
@@ -186,7 +359,37 @@ def arrange_data_glm(dff_traces, images, stim_table):
 
 	return data, stim_array
 
-def arrange_data_trialTensor(dff_traces, stim_table):
+
+def arrange_rs_glm(rs, stim_table):
+
+	running_speed = []
+
+	for index, row in stim_table.iterrows():
+		running_speed.append(np.average(rs[row['start']:row['end']]))
+
+	return running_speed
+
+def get_index_array(stim_table):
+	index_array = []
+
+	for index, row in stim_table.iterrows():
+		index_array.append(row['frame'])
+	return np.array(index_array)
+
+def trial_average(data, index_array):
+
+	l, n_neurons = data.shape
+
+	n_conditions = len(set(index_array))
+	trial_average = np.zeros([n_conditions, n_neurons])
+	for i in range(l):
+		trial_average[index_array[i]] += data[i]
+
+	trial_average /= n_conditions
+
+	return trial_average
+
+def arrange_ns_data_trialTensor(dff_traces, stim_table):
 	'''
 	In this function we want to take dff traces (n_neurons x ntrials*ntimepointspertrial)
 	and return data_Tensor = n_neurons x n_conditions x n_trials x trialLength
@@ -393,3 +596,12 @@ def make_tuning_curves(tb_data, data_set):
 	    rs_results[ds] = stim_results	
 
 	return rs_results
+
+
+def gaussian_variance(y, x, w, o, s, non_lin = sigmoid):
+    N_samples = len(y)
+    temp = (y-s*non_lin(x.dot(w) - o)**2)
+    temp = np.sum(temp, axis = 0)
+
+
+    return (1./N_samples) * temp

@@ -4,3 +4,6 @@ deprecated notebooks
 .*
 boc/*.json
 boc/*/*.nwb
+boc/*.mat
+boc/formatted/*.pkl
+boc/formatted/Tuning_Curve_Results/*.pkl

@@ -63,7 +63,7 @@ class GLM():
 		pass
 
 
-	def fit(self, X, y, X_val = None, y_val = None, batch_size = 1000, max_iters = 500):
+	def fit(self, X, y, X_val = None, y_val = None, batch_size = 10000, max_iters = 500):
 
 		loss_arr = []
 		cross_val = []
@@ -73,7 +73,9 @@ class GLM():
 		if self.verbose:
 			bar = pyprind.ProgBar(max_iters, bar_char='*')
 
-		for i in range(max_iters):
+		converged = False
+
+		for i in range(max_iters) and ~converged:
 		    idx = np.random.randint(0, T, size = batch_size)
 		    
 		    train_feat = X#[idx] 
@@ -88,7 +90,14 @@ class GLM():
 
 		    	l1 = self.sess.run([self.log_loss], feed_dict = {self.design_:X_val, self.obs_:y_val})
 		    	cross_val.append(l1)
-		    	    
+		    
+
+		    if i > 10:
+		    	print (np.average(cross_val[-5:]]) - np.average(cross_val[-10:-5]))
+
+		    	if (np.average(cross_val[-5:]]) - np.average(cross_val[-10:-5])) >  0.001 :
+		    		converged = True
+
 		    loss_arr.append(l)	    
 
 		return loss_arr, cross_val 
