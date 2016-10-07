@@ -22,10 +22,11 @@ class GLM():
 	Each class that inherits from GLM should override the _logloss function. 
 
 	'''
+	#offset_init = 0.01*np.ones([num_neurons]), scale_init= 0.01*np.ones([num_neurons])
 
 	def __init__(self, weight_init,
-		lr = 1e-2, eps = 1e-4, bias_init = 0.01, train_params = True,
-		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 3, verbose = True, cap_grads = True):
+		lr = 1e-2, eps = 1e-4, bias_init = 0.01, train_params = True, offset_init = 0.01,
+		reg = 'l1', alpha = .1, non_lin = 'sigmoid', scale_init = 0.01, verbose = True, cap_grads = True):
 		'''
 		Initialize the computational graph for the exponential GLM. 
 
@@ -33,9 +34,24 @@ class GLM():
 		
 		'''	
 
+
+
+		if non_lin == 'sigmoid' :
+			self.np_nonlin = sigmoid
+			self.non_lin = tf.nn.sigmoid
+		if non_lin == 'identity' :
+			self.non_lin = tf_identity
+			self.np_nonlin = tf_identity
+		if non_lin == 'exp':
+			self.np_nonlin = np.exp
+			self.non_lin = tf.exp
+		if non_lin == 'soft_rect':
+			self.non_lin = tf_soft_rec
+			self.np_nonlin = np_soft_rec
+
 		self.num_features, self.num_neurons = weight_init.shape
 
-		self.non_lin, self.alpha, self.reg, self.verbose = non_lin, alpha, reg, verbose
+		self.alpha, self.reg, self.verbose =  alpha, reg, verbose
 		self.lr, self.eps = lr, eps
 
 		tf.reset_default_graph()
@@ -46,10 +62,9 @@ class GLM():
 		
 		self.weights = tf.Variable(weight_init, dtype = 'float32', name = 'weights')
 
-		self.offset = bias_init*tf.Variable(np.ones([self.num_neurons]), dtype = 'float32', trainable = train_params)
-		self.scale = scale_init*tf.Variable(np.ones([self.num_neurons]), dtype = 'float32', trainable = train_params)
-		self.nonlin_offset = bias_init*tf.Variable(np.ones([self.num_neurons]), dtype = 'float32')
-
+		self.offset = tf.Variable(bias_init, dtype = 'float32', trainable = train_params)
+		self.scale = tf.Variable(scale_init, dtype = 'float32', trainable = train_params)
+		self.nonlin_offset = tf.Variable(offset_init, dtype = 'float32')
 
 		self.log_loss = self._logloss()
 
@@ -57,8 +72,8 @@ class GLM():
 			optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
 			
 			#optimizer = tf.train.GradientDescentOptimizer(learning_rate = self.lr)
-			gvs = optimizer.compute_gradients(self.log_loss)
-			capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+			self.gvs = optimizer.compute_gradients(self.log_loss)
+			capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.gvs]
 
 			self.train_step = optimizer.apply_gradients(capped_gvs)
 		else:
@@ -81,8 +96,6 @@ class GLM():
 		if self.verbose:
 			bar = pyprind.ProgBar(max_iters, bar_char='*')
 
-		converged = False
-			
 		for i in range(max_iters):
 		    idx = np.random.randint(0, T, size = batch_size)
 		    
@@ -93,18 +106,21 @@ class GLM():
 		    	bar.update()
 		    
 		    l, _ = self.sess.run([self.log_loss, self.train_step], feed_dict = {self.design_:train_feat, self.obs_: train_obs})
+			 
 
+		    #print "the loss is: ", l, " it's shape is: ", l.shape
+		    #print "the current offset value is: ", off, "it's shape is: ", off.shape
+		    #print "the current input to the non-linearity is: " , fx, " it's shape is: ", fx.shape
+		    #print "the current output of the non-linearity is: ", lam_, " it's shape is: ", lam_.shape
+		    #print "the current distrib is: ", distrib, " it's shape is: ", distrib.shape
+		    #print "the current coef is: ", coef, " it's shape is: ", coef.shape
 
 		    if i % 10 == 0 and X_val != None:
 
 		    	l1 = self.sess.run(self.log_loss, feed_dict = {self.design_:X_val, self.obs_:y_val})
 		    	cross_val.append(l1)
-	    	    
-		    loss_arr.append(l)
-
-		    if i > 10:
-				if (np.average(cross_val[-5:]) - np.average(cross_val[-10:-5])) >  0.001:
-					break
+		    	    
+		    loss_arr.append(l)	    
 
 		return np.array(loss_arr), np.array(cross_val) 
 
@@ -116,7 +132,8 @@ class GLM():
 		'''
 		returns weights, offset, scale
 		'''
-		return self.sess.run(self.weights), self.sess.run(self.offset), self.sess.run(self.scale)
+		
+		return self.sess.run(self.weights), self.sess.run(self.offset), self.sess.run(self.nonlin_offset), self.sess.run(self.scale)
 
 	def score(self, X, y):
 		'''
@@ -142,16 +159,16 @@ class exponential_GLM(GLM):
 	'''
 
 	def __init__(self, weight_init,
-		lr = 1e-2, eps = 1e-4, bias_init = 0.01, train_params = True,
-		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
+		lr = 1e-2, eps = 1e-4, bias_init = 0.01, train_params = True, offset_init = 0.01, cap_grads = True,
+		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 0.01, verbose = True):
 		'''
 		Initialize the computational graph for the exponential GLM. Inherits from 
 		the base GLM class, where all the instance variables are initialized / defined.
 		
 		'''	
 		
-		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params,
-			reg, alpha, non_lin, scale_init, verbose)
+		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params, offset_init,
+			reg, alpha, non_lin, scale_init, verbose, cap_grads)
 
 	def _logloss(self):
 		'''
@@ -162,20 +179,22 @@ class exponential_GLM(GLM):
 
 		
 		
-		fx = tf.matmul(self.design_, self.weights) - self.offset
+		self.fx = tf.matmul(self.design_, self.weights) - self.offset
 		#fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
-		#fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
-
-		lam = self.non_lin(fx) - self.nonlin_offset
-
-		self.scale = tf.nn.relu(self.scale)
-
-		lam_ = tf.mul(self.scale,lam)+ self.eps
 		
+		#self.fx = tf.reduce_sum(self.fx, reduction_indices = [0])
 
-		coef = tf.log(lam_)
-		distrib = tf.div(self.obs_, lam_)
-		self.loss = tf.reduce_sum(coef + distrib, reduction_indices = [0])
+		self.nonlin_offset = tf.nn.relu(self.nonlin_offset) + self.eps
+		self.scale = tf.nn.relu(self.scale) + self.eps
+
+		self.lam = self.non_lin(self.fx) + self.nonlin_offset
+		#self.lam = tf.nn.relu(self.lam) + self.eps
+		self.lam_ = tf.mul(self.scale,self.lam)+ self.eps
+
+
+		self.coef = tf.log(self.lam_)
+		self.distrib = tf.div(self.obs_, self.lam_)
+		self.loss = tf.reduce_sum(self.coef + self.distrib, reduction_indices = [0])
 
 		if self.reg == 'l2':	
 			self.loss += alpha*tf.reduce_sum(tf.matmul(self.weights, self.weights, transpose_a = True))
@@ -188,6 +207,9 @@ class exponential_GLM(GLM):
 		return self.loss
 
 
+	def get_log_likelihood(self, data, stimulus):
+		A = self.sess.run(self.log_loss, feed_dict = {self.design_: stimulus, self.obs_: data})
+		return -A *  1./len(data)
 
 class poisson_GLM(GLM):
 	def __init__(self, weight_init, 
@@ -229,20 +251,19 @@ class poisson_GLM(GLM):
 		if self.reg == 'l1': 
 			self.loss += alpha*tf.reduce_sum(self.weights + self.offset + self.scale )
 		
-		return self.loss
 
 
 
 class gaussian_GLM(GLM):
 	def __init__(self, weight_init,
-		lr = 1e-2, eps = 1e-4, bias_init = 0.01, train_params = True,
-		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 1, verbose = True):
+		lr = 1e-2, eps = 1e-4, bias_init = 0.01, train_params = True, offset_init = 0.01,
+		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 0.01, verbose = True):
 		'''
 		initializes the computational graph for a poisson GLM with either exponential
 		or sigmoidal non-linearity. 
 		'''	
 
-		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params,
+		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params, offset_init, 
 			reg, alpha, non_lin, scale_init, verbose)
 
 	def _logloss(self):
@@ -256,7 +277,10 @@ class gaussian_GLM(GLM):
 		#fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
 		#fx = tf.reduce_sum(fx, reduction_indices = [1])- self.offset
 		
-		lam = self.non_lin(fx) - self.nonlin_offset
+
+		self.nonlin_offset = tf.nn.relu(self.nonlin_offset) + self.eps
+
+		lam = self.non_lin(fx) + self.nonlin_offset
 
 		self.scale = tf.nn.relu(self.scale)
 		lam_ = tf.mul(self.scale,lam)+ self.eps
@@ -274,6 +298,14 @@ class gaussian_GLM(GLM):
 		
 		return self.loss
 
+	def get_log_likelihood(self, data, stimulus):
+		A = self.sess.run(self.log_loss, feed_dict = {self.design_: stimulus, self.obs_: data})
+		N = float(len(data))
+		w, o, nls, s = self.get_params()
+		var = gaussian_variance(data, stimulus, w, o, nls, s, non_lin = self.np_nonlin)
+		#var = 1.12
+		l = 1/N * (-N/2 * np.log(2*np.pi) - N/2 * np.log(var) - 1 / (2*var) * A)
+		return l
 
 
 class lognormal_GLM(GLM):

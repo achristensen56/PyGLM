@@ -15,6 +15,8 @@ import pandas as pd
 import sys
 import logging
 from sklearn.decomposition import PCA
+from statsmodels.robust.scale import mad
+
 logging.basicConfig()
 
 def generate_data(T = 10000, n = 30, eps = 1e-4, 
@@ -53,13 +55,15 @@ def sigmoid(x):
 
 def tf_soft_rec(x):
 	return tf.log(1 + tf.exp(x))
+def np_soft_rec(x):
+	return np.log(1 + np.exp(x))
 
-def cond_int(non_lin, weights, stim, scale, c):
+def cond_int(non_lin, weights, stim, scale, c, nls = 0):
 	'''
 	returns the conditional intensity \lambda = f(w^TX)
 	'''
 	h = stim.dot(weights)
-	f = scale*non_lin(h-c)
+	f = scale*(non_lin(h-c) + nls)
 	return f
 
 def gamma_model(cond_int, p = 1):
@@ -76,7 +80,7 @@ def poisson_model(cond_int):
 	return y
 
 def gaussian_model(cond_int):
-	y = np.random.normal(cond_int)
+	y = np.random.normal(cond_int, 1)
 	return y
 
 def generate_gamma_data(non_lin, T = 1000, n = 30, eps = 1e-1, c = 3, scale = 5, filt_amp = 10, stim = None):
@@ -598,10 +602,19 @@ def make_tuning_curves(tb_data, data_set):
 	return rs_results
 
 
-def gaussian_variance(y, x, w, o, s, non_lin = sigmoid):
-    N_samples = len(y)
-    temp = (y-s*non_lin(x.dot(w) - o)**2)
-    temp = np.sum(temp, axis = 0)
+def gaussian_variance(y, x, w, o, nls, s, non_lin = sigmoid):
+	T = len(y)
+	c_int = cond_int(non_lin, w, x, s, o, nls)
 
+	return (1./T * sum((y-c_int)**2))
 
-    return (1./N_samples) * temp
+def mad_scaling(data):
+
+	L, N = data.shape
+
+	offset = np.mean(data, axis = 0) - mad(data, axis = 0, c = .6);
+	top = np.mean(data, axis = 0) + mad(data, axis = 0, c = .6);
+	return offset, top
+
+def tf_identity(data):
+	return data

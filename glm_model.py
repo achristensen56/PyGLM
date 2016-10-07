@@ -93,9 +93,9 @@ class GLM():
 		    
 
 		    if i > 10:
-		    	print (np.average(cross_val[-5:]]) - np.average(cross_val[-10:-5]))
+		    	print (np.average(cross_val[-5:]) - np.average(cross_val[-10:-5]))
 
-		    	if (np.average(cross_val[-5:]]) - np.average(cross_val[-10:-5])) >  0.001 :
+		    	if (np.average(cross_val[-5:]) - np.average(cross_val[-10:-5])) >  0.001 :
 		    		converged = True
 
 		    loss_arr.append(l)	    

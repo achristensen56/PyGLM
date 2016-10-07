@@ -8,8 +8,8 @@ import pickle
 import allensdk.brain_observatory.stimulus_info as stim_info
 import itertools as it
 
-def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity = [tf.exp, tf.nn.sigmoid], batch_size = 5000,
-	noise_model = ['exponential', 'gaussian', 'lognormal'], num_pcs = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 118], debug = False, max_iters = 2000):
+def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity = ['exp', 'sigmoid'], batch_size = 10000, offset_init = 0, scale_init = 1, bias_init = 0,
+	noise_model = ['exponential', 'gaussian', 'lognormal'], num_pcs = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 118], debug = False, max_iters = 1000):
 	'''
 	dff_array (numpy array) = n_time_bins x n_cells
 	design_matrx (numpy array) = n_time_bins n_features
@@ -55,6 +55,8 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 					if nl == tf.exp or nl == tf_soft_rec:
 						#the exponential non-linearity 
 						tp = False
+						scale_init = 1
+						bias_init = 0
 						#lr = 1e-3
 
 
@@ -63,6 +65,7 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 					test_l = []
 
 					weights = []
+					nonlin_offset = []
 					offset = []
 					scale = []
 					variance = []
@@ -75,8 +78,8 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 
 						weight_init = np.linalg.pinv(X_train).dot(y_train) 
 
-						model = nm_dict[nm](weight_init,
-							lr = lr, train_params = tp, alpha = 0, reg = '', non_lin = nl, verbose = False)
+						model = nm_dict[nm](weight_init, lr = lr, train_params = tp, alpha = 0, reg = '', non_lin = nl, 
+							verbose = False, offset_init = offset_init, scale_init= scale_init, bias_init = bias_init)
 
 						L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = max_iters, batch_size = batch_size)
 						
@@ -93,46 +96,28 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 								print "The test likelihood is NAN"
 
 
-						w, o, s = model.get_params()	
+						w, o, nls, s = model.get_params()	
 
-						l = np.array(l)
-						L = np.array(L)
 
 						w = np.array(w)
 
 						weights.append(w)
 						offset.append(o)
+						nonlin_offset.append(nls)
 						scale.append(s)
-						N = float(len(y_test))
-						A = np.squeeze(l[-1, :])
 
+						l = model.get_log_likelihood(y_test, X_test)
 
-						if nm == 'gaussian':
-
-							var = gaussian_variance(y_train, X_train, w, o, s)
-
-							variance.append(var)
-
-							l = 1/N * (-N/2 * np.log(2*np.pi) - N/2 * np.log(var) - 1 / (2*var) * A)
-						else:
-							l = -A / N
-
-						
-
+						l.shape
 						test_l.append(l)
 
-					weights = np.array(weights)
 
 					#the parameters
 					w = np.mean(np.array(weights), axis = 0).T
-
-					plt.plot(w.T)
-
 					o = np.mean(offset, axis = 0)
 					s = np.mean(scale, axis = 0)
-					if 'nm' == 'gaussian':
-						v = np.mean(variance, axis =0)
-						features[:,k,j,m,n,n, -3] = v
+					nls = np.mean(nonlin_offset, axis = 0)
+
 
 					l = np.mean(np.array(test_l), axis = 0)
 
@@ -140,7 +125,7 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 
 					scores[:, k, j, m, n] = l
 					features[:, k, j, m, n, 0:npcs] = w
-
+					features[:, k, j, m, n, -3] = nls
 					features[:, k, j, m, n,-2] = o
 					features[:, k, j, m, n, -1] = s
 		
