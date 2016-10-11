@@ -54,9 +54,7 @@ class GLM():
 		self.alpha, self.reg, self.verbose =  alpha, reg, verbose
 		self.lr, self.eps = lr, eps
 
-		tf.reset_default_graph()
-		self.sess = tf.Session()
-		
+
 		self.design_ = tf.placeholder('float32', [None, self.num_features])
 		self.obs_ = tf.placeholder('float32', [None, self.num_neurons])
 		
@@ -166,6 +164,11 @@ class exponential_GLM(GLM):
 		the base GLM class, where all the instance variables are initialized / defined.
 		
 		'''	
+		tf.reset_default_graph()
+		self.sess = tf.Session()
+		
+		#just for gamma GLM
+
 		
 		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params, offset_init,
 			reg, alpha, non_lin, scale_init, verbose, cap_grads)
@@ -262,6 +265,10 @@ class gaussian_GLM(GLM):
 		initializes the computational graph for a poisson GLM with either exponential
 		or sigmoidal non-linearity. 
 		'''	
+		tf.reset_default_graph()
+		self.sess = tf.Session()
+		
+		#just for gamma GLM
 
 		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params, offset_init, 
 			reg, alpha, non_lin, scale_init, verbose)
@@ -306,6 +313,74 @@ class gaussian_GLM(GLM):
 		#var = 1.12
 		l = 1/N * (-N/2 * np.log(2*np.pi) - N/2 * np.log(var) - 1 / (2*var) * A)
 		return l
+
+class gamma_GLM(GLM):
+	def __init__(self, weight_init,
+		lr = 1e-2, eps = 1e-4, bias_init = 0.01, train_params = True, offset_init = 0.01, cap_grads = True,
+		reg = 'l1', alpha = .1, non_lin = tf.sigmoid, scale_init = 0.01, verbose = True, alpha_init = 1):
+		'''
+		Initialize the computational graph for the gamma GLM. Inherits from 
+		the base GLM class, where all the instance variables are initialized / defined.
+		
+		'''	
+		tf.reset_default_graph()
+		self.sess = tf.Session()
+		self.num_features, self.num_neurons = weight_init.shape
+		
+		#just for gamma GLM
+		self.alpha_param = 1.5*tf.Variable(np.ones([1, self.num_neurons]), dtype = 'float32', trainable = True)
+		
+		GLM.__init__(self, weight_init, lr, eps, bias_init, train_params, offset_init,
+			reg, alpha, non_lin, scale_init, verbose, cap_grads)
+
+		
+
+	def _logloss(self):
+		'''
+
+		'''	
+
+		alpha = self.alpha
+
+		
+		
+		self.fx = tf.matmul(self.design_, self.weights) - self.offset
+		#fx = tf.reshape(fx, [-1, self.num_features, self.num_neurons])
+		
+		#self.fx = tf.reduce_sum(self.fx, reduction_indices = [0])
+
+		self.nonlin_offset = tf.nn.relu(self.nonlin_offset) + self.eps
+		self.scale = tf.nn.relu(self.scale) + self.eps
+		self.alpha_param  = tf.nn.relu(self.alpha_param) + self.eps 
+
+		self.lam = self.non_lin(self.fx) + self.nonlin_offset
+		#self.lam = tf.nn.relu(self.lam) + self.eps
+		self.lam_ = tf.mul(self.scale,self.lam)+ self.eps
+		self.lam_ = tf.div(self.alpha_param, self.lam_)
+
+		
+
+		self.loss =  -tf.reduce_sum(tf.contrib.distributions.Gamma(self.alpha_param, self.lam_).log_pdf(self.obs_), reduction_indices = [0])
+		
+
+		#self.coef = tf.log(self.lam_)
+		#self.distrib = tf.div(self.obs_, self.lam_)
+		#self.loss = tf.reduce_sum(self.coef + self.distrib, reduction_indices = [0])
+
+		if self.reg == 'l2':	
+			self.loss += alpha*tf.reduce_sum(tf.matmul(self.weights, self.weights, transpose_a = True))
+			self.loss += alpha*tf.reduce_sum(tf.pow(self.scale, 2))
+			self.loss += alpha*tf.reduce_sum(tf.pow(self.offset, 2))
+
+		if self.reg == 'l1': 
+			self.loss += alpha*tf.reduce_sum(self.weights + self.offset + self.scale )
+		
+		return self.loss	
+
+	def get_log_likelihood(self, data, stimulus):
+		A = self.sess.run(self.log_loss, feed_dict = {self.design_: stimulus, self.obs_: data})
+		return -A *  1./len(data)
+
 
 
 class lognormal_GLM(GLM):

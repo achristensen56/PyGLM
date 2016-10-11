@@ -8,8 +8,8 @@ import pickle
 import allensdk.brain_observatory.stimulus_info as stim_info
 import itertools as it
 
-def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity = ['exp', 'sigmoid'], batch_size = 10000, offset_init = 0, scale_init = 1, bias_init = 0,
-	noise_model = ['exponential', 'gaussian', 'lognormal'], num_pcs = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 118], debug = False, max_iters = 1000):
+def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], CV_folds = 5, non_linearity = ['exp', 'sigmoid'], batch_size = 10000, offset_init = 0, scale_init = 1, bias_init = 0,
+	noise_model = ['exponential', 'gaussian', 'lognormal'], num_pcs = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 118], debug = False, max_iters = 500):
 	'''
 	dff_array (numpy array) = n_time_bins x n_cells
 	design_matrx (numpy array) = n_time_bins n_features
@@ -36,9 +36,9 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 	n_nl, n_nm, n_pcs, n_lrs = len(non_linearity), len(noise_model), len(num_pcs), len(learning_rate)
 
 	scores = np.zeros([n_cells, n_nl, n_nm, n_pcs, n_lrs])
-	features = np.zeros([n_cells, n_nl, n_nm, n_pcs, n_lrs, n_features + 3]) 
+	features = np.zeros([n_cells, n_nl, n_nm, n_pcs, n_lrs, n_features + 4]) 
 
-	nm_dict = {'exponential': gm.exponential_GLM, 'gaussian': gm.gaussian_GLM, 'lognormal': gm.lognormal_GLM}
+	nm_dict = {'exponential': gm.exponential_GLM, 'gaussian': gm.gaussian_GLM, 'lognormal': gm.lognormal_GLM, 'gamma': gm.gamma_GLM}
 	b = pyprind.ProgBar(len(noise_model)* len(non_linearity)*len(num_pcs))
 
 
@@ -58,12 +58,14 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 						scale_init = 1
 						bias_init = 0
 						#lr = 1e-3
+					if nm == 'gaussian':
+						max_iters = 1000;
 
 
 
 					#here we fit 5 different versions of the model, on different test sets, and average them together
 					test_l = []
-
+					alpha = []
 					weights = []
 					nonlin_offset = []
 					offset = []
@@ -72,14 +74,15 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 
 					print "Fitting: ", nm, " noise model with: ", nl, " non-linearity, and: " , npcs ,"features"
 
-					for i in range(5):
+
+					for i in range(CV_folds):
 
 						X_train, X_test, y_train, y_test = train_test_split(design_matrix[:, 0:npcs], dff_array)
 
 						weight_init = np.linalg.pinv(X_train).dot(y_train) 
 
 						model = nm_dict[nm](weight_init, lr = lr, train_params = tp, alpha = 0, reg = '', non_lin = nl, 
-							verbose = False, offset_init = offset_init, scale_init= scale_init, bias_init = bias_init)
+							verbose = True, offset_init = offset_init, scale_init= scale_init, bias_init = bias_init)
 
 						L, l = model.fit(X_train, y_train, X_test, y_test, max_iters = max_iters, batch_size = batch_size)
 						
@@ -98,9 +101,12 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 
 						w, o, nls, s = model.get_params()	
 
+						a = None
+						if nm == 'gamma':
+							a = model.sess.run(model.alpha_param)
 
 						w = np.array(w)
-
+						alpha.append(a)
 						weights.append(w)
 						offset.append(o)
 						nonlin_offset.append(nls)
@@ -108,11 +114,13 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 
 						l = model.get_log_likelihood(y_test, X_test)
 
-						l.shape
 						test_l.append(l)
 
 
 					#the parameters
+					if nm == 'gamma':
+						a = np.mean(np.array(alpha), axis = 0)
+
 					w = np.mean(np.array(weights), axis = 0).T
 					o = np.mean(offset, axis = 0)
 					s = np.mean(scale, axis = 0)
@@ -128,7 +136,7 @@ def fit_glm_CV(dff_array, design_matrix, learning_rate = [0.001], non_linearity 
 					features[:, k, j, m, n, -3] = nls
 					features[:, k, j, m, n,-2] = o
 					features[:, k, j, m, n, -1] = s
-		
+					features[:, k, j, m, n, -4] = a
 
 	return scores, features	 
 

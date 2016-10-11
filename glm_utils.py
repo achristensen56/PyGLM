@@ -66,12 +66,12 @@ def cond_int(non_lin, weights, stim, scale, c, nls = 0):
 	f = scale*(non_lin(h-c) + nls)
 	return f
 
-def gamma_model(cond_int, p = 1):
+def gamma_model(cond_int, p = 2):
 	'''
 	draws from a gamma distribution with shape parameter p. 
 	and mean 'cond_int'
 	'''
-	y = np.random.gamma(p, cond_int)
+	y = np.random.gamma(p, cond_int/p)
 	return y
 
 
@@ -477,22 +477,23 @@ def arrange_data_rs(data_set, bin = True):
 	    data  = arranged_data[ds_id]
 	    
 	    #binning into synthetic, natural, and stimulus
-	    #_data = {'synthetic_rs': None, 'natural_rs': None, 'spontaneous_rs': None,'synthetic_dff': None, 'natural_dff': None, 'spontaneous_dff':None}
+	    _data = {'synthetic_rs': None, 'natural_rs': None, 'spontaneous_rs': None,'synthetic_dff': None, 'natural_dff': None, 'spontaneous_dff':None}
 	    
 	    #just binning into stimulus and spontaneous
-	    _data = {'stimulus_rs': None, 'spontaneous_rs': None,'stimulus_dff': None, 'spontaneous_dff':None}
+	    #_data = {'stimulus_rs': None, 'spontaneous_rs': None,'stimulus_dff': None, 'spontaneous_dff':None}
 	    
 	    for stimulus in data_set[ds_id].list_stimuli():
 	        
 	        if (stimulus == 'locally_sparse_noise') or ('gratings' in stimulus):
-	            stim_key = 'stimulus'
-	            #stim_key = 'synthetic'
+	        #    stim_key = 'stimulus'
+	             stim_key = 'synthetic'
 	        elif ('natural' in stimulus):
-	            stim_key = 'stimulus'
-	            #stim_key = 'natural'
+	        #    stim_key = 'stimulus'
+	             stim_key = 'natural'
 	        elif ('spontaneous' == stimulus):
-	            stim_key = 'spontaneous'
-	            
+	             stim_key = 'spontaneous'
+	          
+	        #stim_key = stimulus  
 	        run_speed =  np.array(data[stimulus + '_rs'])
 	        dff = np.array(data[stimulus + '_dff'])
 	        
@@ -618,3 +619,4 @@ def mad_scaling(data):
 
 def tf_identity(data):
 	return data
+
